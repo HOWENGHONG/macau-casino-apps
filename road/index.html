@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-HK"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#160706"><title>百家樂記路</title>
+<style>:root{--gold:#e9c46a;--gold2:#f7dc8f;--B:#d7263d;--P:#1e5bd8;--T:#1f9d4c;--c:20px;
+  --font:"Noto Sans TC","Noto Sans CJK TC","PingFang HK","Microsoft JhengHei",system-ui,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#12070a;color:#fff;font-family:var(--font);user-select:none;-webkit-user-select:none;touch-action:manipulation;overscroll-behavior:none}
+button{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
+#app{position:fixed;inset:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr auto auto auto;grid-template-areas:"hdr" "ban" "board" "stats" "pred" "pad";
+  background:radial-gradient(ellipse at 50% 0%,rgba(233,196,106,.16),transparent 55%),repeating-linear-gradient(45deg,rgba(255,215,120,.03) 0 6px,transparent 6px 18px),#150709}
+#hdr{grid-area:hdr;display:flex;align-items:center;gap:8px;padding:8px 12px;background:linear-gradient(#2a0f0a,#160706);border-bottom:2px solid #7a5a22}
+#hdr .t{font-weight:900;font-size:20px;color:var(--gold2);letter-spacing:2px;white-space:nowrap}
+#shoeInfo{font-size:14px;color:#e2cfa6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.hbtn{border:1px solid #a07b3a;background:linear-gradient(#5a3a1a,#34200e);color:#f5e2b8;border-radius:10px;padding:8px 11px;white-space:nowrap;font-size:15px;font-weight:700;min-height:40px}
+#ban{grid-area:ban;display:none;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:#3d2a05;color:#ffe9a8;font-size:14px}
+#ban.show{display:flex}
+#board{grid-area:board;min-height:0;min-width:0;overflow:hidden;padding:6px 6px 0;display:grid;gap:4px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-content:start;
+  grid-template-areas:"big big" "bead bead" "eye eye" "small roach"}
+.road{position:relative;min-width:0;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px #8a6a2a}
+.road .sc{overflow-x:auto;overflow-y:hidden;height:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.road .sc::-webkit-scrollbar{display:none}
+.road svg{display:block}
+.road .rl{position:absolute;right:3px;bottom:1px;font-size:10px;color:#8a8a8a;font-weight:700;pointer-events:none;opacity:.6}
+#rBig{grid-area:big}#rBead{grid-area:bead}#rEye{grid-area:eye}#rSmall{grid-area:small}#rRoach{grid-area:roach}
+.pv{animation:blink .45s infinite alternate}
+@keyframes blink{to{opacity:.1}}
+.nw{animation:blink .4s 4 alternate}
+#stats{grid-area:stats;min-width:0;display:flex;gap:8px;padding:6px 8px;align-items:stretch}
+#counts{flex:1;font-size:13px;line-height:1.45;color:#f3e3c0;background:#120b05;border:1px solid #6b5020;border-radius:8px;padding:5px 8px;min-width:0}
+#counts .r{display:flex;gap:4px 7px;flex-wrap:wrap;align-items:center;white-space:nowrap}
+#counts b{color:#fff;font-variant-numeric:tabular-nums}
+#counts .sm{color:#bda57a;font-size:.9em}
+.dot{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;color:#fff;margin-right:2px;vertical-align:-3px}
+.dot.B{background:var(--B)}.dot.P{background:var(--P)}.dot.T{background:var(--T)}
+#asks{display:flex;flex-direction:column;gap:6px;width:132px}
+.ask{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:10px;border:2px solid;font-weight:800;font-size:14px;min-height:40px;touch-action:none}
+.ask.B{background:rgba(215,38,61,.22);border-color:#ff9a9a;color:#ffd0d0}.ask.P{background:rgba(30,91,216,.22);border-color:#9dbaff;color:#d3e0ff}
+.ask.on{box-shadow:0 0 0 3px #ffe066}
+.ask svg{background:#fff;border-radius:3px}
+#pad{grid-area:pad;padding:4px 8px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.toggles,.mains,.utils{display:flex;gap:8px}
+.tg{flex:1;min-height:46px;border-radius:12px;border:2px dashed rgba(233,196,106,.7);font-size:17px;font-weight:800;color:#f1dfb4;background:rgba(0,0,0,.3)}
+.tg[data-f=bp].on{background:var(--B);border:2px solid #fff;color:#fff}
+.tg[data-f=pp].on{background:var(--P);border:2px solid #fff;color:#fff}
+.tg[data-f=s6].on{background:linear-gradient(#f6d77a,#c7942b);border:2px solid #fff;color:#3a2300}
+.big{flex:1;min-height:96px;border-radius:18px;font-size:44px;font-weight:900;color:#fff;border:3px solid rgba(255,255,255,.85);box-shadow:0 5px 0 rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.3);letter-spacing:4px;position:relative}
+.big small{display:block;font-size:13px;letter-spacing:2px;opacity:.85;font-weight:700}
+.big.B{background:linear-gradient(#e8394f,#9d1022)}.big.P{background:linear-gradient(#3571ee,#123c9c)}.big.T{background:linear-gradient(#29b35a,#0e6230);flex:.7}
+.big:active,.big.pressed{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.ubtn{flex:1;min-height:48px;border-radius:12px;border:2px solid #a07b3a;background:linear-gradient(#5a3a1a,#34200e);font-size:18px;font-weight:800;color:#f5e2b8}
+.ubtn:disabled,.big:disabled,.tg:disabled{opacity:.35}
+#toast{position:fixed;left:50%;bottom:30%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--gold);color:#fff3cf;padding:10px 20px;border-radius:22px;font-size:16px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:80;white-space:nowrap}
+#toast.show{opacity:1}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:90;padding:16px}
+.ov.show{display:flex}
+.dlg{background:linear-gradient(#2b1409,#170a04);border:2px solid var(--gold);border-radius:16px;padding:18px;max-width:420px;width:100%;text-align:center}
+.dlg h3{margin:0 0 8px;color:var(--gold2);font-size:20px}.dlg p{margin:0 0 16px;font-size:16px;color:#f3e6cc;line-height:1.5}
+.dlg .row{display:flex;gap:10px}
+.dlg .row button{flex:1;min-height:50px;border-radius:12px;font-size:18px;font-weight:800;border:2px solid #a07b3a;background:linear-gradient(#5a3a1a,#34200e);color:#f5e2b8}
+.dlg .row button.ok{background:linear-gradient(#c62b2b,#7a1010);border-color:#ffadad;color:#fff}
+#hist .dlg{max-height:88vh;display:flex;flex-direction:column;text-align:left}
+#histList{overflow:auto;flex:1;margin:6px 0 12px;-webkit-overflow-scrolling:touch}
+.hi{display:flex;align-items:center;gap:8px;padding:10px 6px;border-bottom:1px solid rgba(233,196,106,.25)}
+.hi .info{flex:1;cursor:pointer}.hi .info b{color:var(--gold2)}.hi .info div{font-size:13px;color:#d8c7a2;margin-top:2px}
+.hi .del{border:1px solid #a05050;color:#ffb3b3;border-radius:8px;padding:6px 10px;font-size:14px}
+.hi.cur .info b::after{content:" · 本靴";color:#8ef0ad;font-weight:400}
+.empty{color:#bda57a;text-align:center;padding:20px}
+body.viewing #pad .big,body.viewing #pad .tg,body.viewing #bUndo{opacity:.3;pointer-events:none}
+/* prediction panel */
+#pred{grid-area:pred;min-width:0;margin:0 8px 2px;padding:4px 8px 3px;background:#0f0a14;border:1px solid #5b4a7a;border-radius:8px}
+#pred .ph{display:flex;align-items:center;gap:8px;min-height:30px}
+#pred .pt{font-weight:900;color:#d9c8ff;font-size:14px;white-space:nowrap}
+#pSum{flex:1;font-size:13px;color:#e8e0f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#pSum .pk{margin:0 3px}
+.pk{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 3px;border-radius:10px;font-size:12px;font-weight:900;color:#fff;background:#555}
+.pk.B{background:var(--B)}.pk.P{background:var(--P)}.pk.N{background:#4a4458;color:#cfc6de}
+.sw{position:relative;width:52px;height:30px;border-radius:15px;background:#4a4458;flex:none;transition:background .15s}
+.sw i{position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#ddd;transition:left .15s}
+.sw.on{background:#2fae62}.sw.on i{left:25px;background:#fff}
+#pChips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:3px}
+.chip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.15;min-height:36px;padding:2px 3px;border-radius:7px;background:#1d1628;border:1px solid #3d3355;font-size:12px;color:#e3dbf2;min-width:0;white-space:nowrap}
+.chip .cn{overflow:hidden;text-overflow:ellipsis;max-width:100%;font-weight:700}.chip .cv{display:flex;align-items:center;gap:3px}.chip .pk{min-width:18px;height:18px;font-size:11px}.chip .hr{color:#a89cc2;font-size:11px;font-variant-numeric:tabular-nums}
+.chip.off{opacity:.35}
+.pnote{font-size:11px;color:#9b90b3;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pred.off #pChips,#pred.off .pnote{display:none}
+#pred.off #pSum{color:#8d84a3}
+#pcfg .dlg,#about .dlg{max-height:90vh;display:flex;flex-direction:column;text-align:left}
+.mrow{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 10px;border-bottom:1px solid rgba(233,196,106,.3);font-size:16px;font-weight:700;color:#f3e6cc}
+#pList{overflow:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+.pm{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:9px 2px;border-bottom:1px solid rgba(233,196,106,.18)}
+.pm .nm{font-weight:800;color:var(--gold2);font-size:15px}.pm .ds{grid-column:2/4;font-size:12px;color:#cdbd9a;line-height:1.4}
+.pm .rt{font-size:13px;color:#f3e6cc;text-align:right;white-space:nowrap}.pm .rt small{color:#bda57a}
+.pm.all{background:rgba(233,196,106,.08);border-radius:8px}
+.pm.off .nm,.pm.off .rt{opacity:.45}
+.disc{font-size:13px!important;color:#e0cfa5!important;background:rgba(0,0,0,.35);border-left:3px solid var(--gold);padding:8px 10px;margin:10px 0 12px!important;text-align:left;line-height:1.5!important}
+.abody{overflow:auto;flex:1;min-height:0;margin:0 0 12px;font-size:14px;line-height:1.6;color:#f0e2c4}
+.abody h4{margin:10px 0 2px;color:var(--gold2);font-size:15px}.abody ul{margin:2px 0;padding-left:20px}
+/* short portrait phones (e.g. 360x640): compact prediction row, smaller pad */
+@media (orientation:portrait) and (max-height:700px){
+  #hdr{padding:5px 10px}#hdr .t{font-size:18px}.hbtn{min-height:36px;padding:5px 10px}
+  #pred{padding:2px 6px}#pred .ph{min-height:26px}.sw{width:44px;height:24px}.sw i{width:18px;height:18px}.sw.on i{left:23px}
+  #pChips{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;margin-top:2px}.chip{min-height:30px;font-size:11px;padding:1px 1px;gap:0}
+  .chip .hr{display:none}.chip .pk{min-width:15px;height:15px;font-size:10px}.pnote{display:none}
+  #stats{padding:4px 8px}#counts{font-size:12px;line-height:1.35}.ask{min-height:34px}
+  #pad{gap:6px}.tg{min-height:40px}.big{min-height:70px;font-size:36px}.ubtn{min-height:42px}
+}
+/* landscape */
+@media (orientation:landscape) and (max-height:560px){
+  #app{grid-template-columns:minmax(0,1fr) 250px;grid-template-rows:auto auto 1fr auto auto;grid-template-areas:"hdr pad" "ban pad" "board pad" "stats pad" "pred pad"}
+  #hdr{padding:4px 10px}#hdr .t{font-size:17px}.hbtn{min-height:34px;padding:4px 12px}
+  #board{grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);grid-template-areas:"bead big big big" "eye eye small roach";padding:4px 4px 0}
+  #rEye{grid-area:eye}
+  #pad{padding:6px 8px;justify-content:center;border-left:2px solid #7a5a22;background:rgba(0,0,0,.25)}
+  .mains{flex-direction:column}.big{min-height:64px;font-size:34px;flex:1!important}.big small{display:inline;margin-left:6px}
+  .big.T{min-height:48px}
+  .tg{min-height:40px;font-size:15px}.ubtn{min-height:42px;font-size:16px}
+  #pred{margin:0 4px 3px;padding:2px 6px}#pred .ph{min-height:24px}#pred .pt{font-size:12px}#pSum{font-size:12px}
+  .sw{width:44px;height:24px}.sw i{width:18px;height:18px}.sw.on i{left:23px}
+  #pChips{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px;margin-top:2px}.chip{min-height:22px;font-size:11px;gap:0;padding:1px 2px}
+  .chip .hr{font-size:10px}.chip .pk{min-width:15px;height:15px;font-size:10px}.pnote{display:none}
+  #stats{padding:4px}#counts{font-size:12px;line-height:1.35;padding:3px 8px}#asks{flex-direction:row;width:230px}.ask{min-height:36px}
+}
+</style><link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="百家樂記路">
+<meta name="format-detection" content="telephone=no">
+<style id="pwa-css">/* ===== iOS PWA layer (shared) ===== */
+:root{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
+html,body{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+img,svg,a{-webkit-user-drag:none;-webkit-touch-callout:none}
+input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+/* road app: safe-area padding on the whole grid */
+#app{padding:var(--sat) var(--sar) var(--sab) var(--sal)}
+#pad{padding-bottom:8px}
+.ov{padding:max(16px,var(--sat)) max(16px,var(--sar)) max(16px,var(--sab)) max(16px,var(--sal))}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr"><div class="t">百家樂記路</div><div id="shoeInfo"></div><button class="hbtn" id="bHist">歷史</button><button class="hbtn" id="bAbout">說明</button></header>
+  <div id="ban"><span id="banTxt"></span><button class="hbtn" id="bBack">返回本靴</button></div>
+  <main id="board">
+    <div class="road" id="rBig"><div class="sc"></div><span class="rl">大路</span></div>
+    <div class="road" id="rBead"><div class="sc"></div><span class="rl">珠盤路</span></div>
+    <div class="road" id="rEye"><div class="sc"></div><span class="rl">大眼仔</span></div>
+    <div class="road" id="rSmall"><div class="sc"></div><span class="rl">小路</span></div>
+    <div class="road" id="rRoach"><div class="sc"></div><span class="rl">曱甴路</span></div>
+  </main>
+  <section id="stats">
+    <div id="counts"></div>
+    <div id="asks"><button class="ask B" data-w="B" id="askB"></button><button class="ask P" data-w="P" id="askP"></button></div>
+  </section>
+  <section id="pred">
+    <div class="ph"><span class="pt">多方面預測</span><span id="pSum"></span><button class="sw" id="pSw" aria-label="預測開關"><i></i></button></div>
+    <div id="pChips"></div>
+    <div class="pnote" id="pNote">※ 只屬路紙規律參考，無法抵銷莊家優勢 · 撳此看詳情</div>
+  </section>
+  <section id="pad">
+    <div class="toggles"><button class="tg" data-f="pp">閒對</button><button class="tg" data-f="s6">幸運6</button><button class="tg" data-f="bp">莊對</button></div>
+    <div class="mains"><button class="big P" data-w="P">閒<small>PLAYER</small></button><button class="big T" data-w="T">和<small>TIE</small></button><button class="big B" data-w="B">莊<small>BANKER</small></button></div>
+    <div class="utils"><button class="ubtn" id="bUndo">撤銷</button><button class="ubtn" id="bNew">新靴</button></div>
+  </section>
+  <div class="ov" id="confirm"><div class="dlg"><h3 id="cTitle"></h3><p id="cText"></p><div class="row"><button id="cNo">取消</button><button class="ok" id="cYes">確定</button></div></div></div>
+  <div class="ov" id="hist"><div class="dlg"><h3>牌靴紀錄</h3><div id="histList"></div><div class="row"><button id="hClear">清除全部紀錄</button><button class="ok" id="hClose">關閉</button></div></div></div>
+  <div class="ov" id="pcfg"><div class="dlg"><h3>多方面預測</h3>
+    <div class="mrow"><span>顯示預測面板</span><button class="sw" id="pSw2" aria-label="預測總開關"><i></i></button></div>
+    <div id="pList"></div>
+    <p class="disc" id="pDisc"></p>
+    <div class="row"><button class="ok" id="pClose">關閉</button></div></div></div>
+  <div class="ov" id="about"><div class="dlg"><h3>說明</h3><div class="abody" id="aBody"></div><div class="row"><button class="ok" id="aClose">關閉</button></div></div></div>
+  <div id="toast"></div>
+</div>
+
+<script id="bac-core">
+(function (root) {
+  'use strict';
+  var SUITS = ['♠', '♥', '♦', '♣'];
+  var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  var RULES = { decks: 8, cutFromEnd: 14, mainMin: 100, mainMax: 50000, sideMin: 100, sideMax: 5000,
+    pay: { player: 1, banker: 0.95, bankerNoCommSix: 0.5, tie: 8, pair: 11, super6: 12 } };
+  var MAIN = { player: 1, banker: 1 };
+  var _id = 0;
+  function card(r, s) { return { r: String(r), s: s || '♠', id: 'b' + (++_id) }; }
+  function parseCard(str) { var s = str.slice(-1), r = str.slice(0, -1); var m = { S: '♠', H: '♥', D: '♦', C: '♣' }; return card(r, m[s] || s); }
+  function isRed(c) { return c.s === '♥' || c.s === '♦'; }
+  /** Baccarat point: A=1, 2-9 face value, 10/J/Q/K = 0 */
+  function cardPoint(c) { if (c.r === 'A') return 1; if (c.r === '10' || c.r === 'J' || c.r === 'Q' || c.r === 'K') return 0; return parseInt(c.r, 10); }
+  /** Burn count of the first card: A=1, 10/J/Q/K = 10 */
+  function burnCount(c) { if (c.r === 'A') return 1; if (c.r === '10' || c.r === 'J' || c.r === 'Q' || c.r === 'K') return 10; return parseInt(c.r, 10); }
+  function total(cards) { var t = 0; for (var i = 0; i < cards.length; i++) t += cardPoint(cards[i]); return t % 10; }
+  function isNatural(cards) { return cards.length === 2 && total(cards) >= 8; }
+  /** pt, bt = two-card totals */
+  function playerShouldDraw(pt, bt) { if (pt >= 8 || bt >= 8) return false; return pt <= 5; }
+  /** p3 = point of player's third card, or null if player stood. pt = player's two-card total */
+  function bankerShouldDraw(bt, p3, pt) {
+    if (pt >= 8 || bt >= 8) return false;
+    if (p3 === null || p3 === undefined) return bt <= 5;
+    if (bt <= 2) return true;
+    if (bt === 3) return p3 !== 8;
+    if (bt === 4) return p3 >= 2 && p3 <= 7;
+    if (bt === 5) return p3 >= 4 && p3 <= 7;
+    if (bt === 6) return p3 === 6 || p3 === 7;
+    return false;
+  }
+  function evaluate(p, b) {
+    var pt = total(p), bt = total(b);
+    return { player: p, banker: b, pt: pt, bt: bt, winner: pt > bt ? 'P' : bt > pt ? 'B' : 'T',
+      pPair: p[0].r === p[1].r, bPair: b[0].r === b[1].r, natural: total(p.slice(0, 2)) >= 8 || total(b.slice(0, 2)) >= 8 };
+  }
+  /** Full hand with a draw() function. Deal order: P, B, P, B, [P3], [B3] */
+  function playRound(draw) {
+    var p = [draw()], b = [draw()]; p.push(draw()); b.push(draw());
+    var pt = total(p), bt = total(b), p3 = null;
+    if (playerShouldDraw(pt, bt)) { var c = draw(); p.push(c); p3 = cardPoint(c); }
+    if (bankerShouldDraw(bt, p3, pt)) b.push(draw());
+    return evaluate(p, b);
+  }
+  /**
+   * bets: {player, banker, tie, ppair, bpair, super6}; mode 'comm' | 'nocomm'.
+   * Returns { items: {key:{bet, ret, net, win}}, ret, net, wagered }
+   */
+  function settle(bets, res, mode) {
+    var items = {}, ret = 0, wagered = 0;
+    function put(k, r) { var b = bets[k] || 0; if (!b) return; items[k] = { bet: b, ret: r, net: r - b, win: r > b, push: r === b }; ret += r; wagered += b; }
+    var w = res.winner;
+    put('player', w === 'P' ? bets.player * 2 : w === 'T' ? bets.player : 0);
+    var bk = bets.banker || 0;
+    put('banker', w === 'B' ? (mode === 'nocomm' ? (res.bt === 6 ? bk + bk * RULES.pay.bankerNoCommSix : bk * 2) : bk + bk * RULES.pay.banker) : w === 'T' ? bk : 0);
+    put('tie', w === 'T' ? bets.tie * (RULES.pay.tie + 1) : 0);
+    put('ppair', res.pPair ? bets.ppair * (RULES.pay.pair + 1) : 0);
+    put('bpair', res.bPair ? bets.bpair * (RULES.pay.pair + 1) : 0);
+    put('super6', mode !== 'nocomm' ? bets.super6 : (w === 'B' && res.bt === 6 ? bets.super6 * (RULES.pay.super6 + 1) : 0));
+    return { items: items, ret: ret, net: ret - wagered, wagered: wagered };
+  }
+  function checkBet(key, bets, add, bankroll, mode) {
+    if (add > bankroll) return '餘額不足';
+    if (key === 'super6' && mode !== 'nocomm') return '超級6 只限免佣模式';
+    if (key === 'player' && bets.banker) return '不可同時押莊及閒';
+    if (key === 'banker' && bets.player) return '不可同時押莊及閒';
+    var max = MAIN[key] ? RULES.mainMax : RULES.sideMax;
+    if ((bets[key] || 0) + add > max) return '上限 HK$' + max.toLocaleString('en-US');
+    return '';
+  }
+  // ---------- Shoe ----------
+  function Shoe(decks, rng) { this.decks = decks || RULES.decks; this.rng = rng || Math.random; this.shuffle(); }
+  Shoe.prototype.shuffle = function () {
+    var cards = [];
+    for (var d = 0; d < this.decks; d++) for (var s = 0; s < 4; s++) for (var r = 0; r < 13; r++) cards.push(card(RANKS[r], SUITS[s]));
+    for (var i = cards.length - 1; i > 0; i--) { var j = Math.floor(this.rng() * (i + 1)); var t = cards[i]; cards[i] = cards[j]; cards[j] = t; }
+    this.cards = cards; this.pos = 0; this.cut = cards.length - RULES.cutFromEnd; this.burned = null;
+  };
+  /** Standard burn: expose first card, burn that many more (10/J/Q/K = 10). */
+  Shoe.prototype.burn = function () {
+    var first = this.draw(), n = burnCount(first), cards = [first];
+    for (var i = 0; i < n; i++) cards.push(this.draw());
+    this.burned = { first: first, count: n, cards: cards };
+    return this.burned;
+  };
+  Shoe.prototype.draw = function () { if (this.pos >= this.cards.length) throw new Error('shoe exhausted'); return this.cards[this.pos++]; };
+  Shoe.prototype.remaining = function () { return this.cards.length - this.pos; };
+  Shoe.prototype.total = function () { return this.cards.length; };
+  Shoe.prototype.needsShuffle = function () { return this.pos >= this.cut; };
+  Shoe.prototype.stack = function (arr) { var cs = arr.map(function (x) { return typeof x === 'string' ? parseCard(x) : x; }); this.cards.splice.apply(this.cards, [this.pos, 0].concat(cs)); };
+
+  // ---------- Roadmaps ----------
+  /** history item: {w:'B'|'P'|'T', bp:bool, pp:bool}. Returns logical Big Road columns. */
+  function bigRoad(history) {
+    var cols = [], lead = 0;
+    history.forEach(function (h, i) {
+      if (h.w === 'T') { if (cols.length) { var c = cols[cols.length - 1]; c[c.length - 1].ties++; } else lead++; return; }
+      var e = { w: h.w, ties: 0, bp: !!h.bp, pp: !!h.pp, i: i };
+      if (!cols.length || cols[cols.length - 1][0].w !== h.w) cols.push([]);
+      if (lead && cols.length === 1 && !cols[0].length) { e.leadTies = lead; }
+      cols[cols.length - 1].push(e);
+    });
+    return { cols: cols, leadTies: lead };
+  }
+  /** Derived road (k=1 大眼仔, 2 小路, 3 曱甴路). Returns array of 'R'|'B'. */
+  function derived(cols, k) {
+    var out = [];
+    for (var c = 0; c < cols.length; c++) for (var r = 0; r < cols[c].length; r++) {
+      if (c < k || (c === k && r === 0)) continue;
+      if (r === 0) out.push(cols[c - 1].length === cols[c - 1 - k].length ? 'R' : 'B');   // 齊整
+      else { var ref = cols[c - k].length; out.push(ref > r ? 'R' : ref === r ? 'B' : 'R'); } // 有對 / 直落 / 無對
+    }
+    return out;
+  }
+  function group(seq) { var cols = []; seq.forEach(function (x) { if (!cols.length || cols[cols.length - 1][0] !== x) cols.push([]); cols[cols.length - 1].push(x); }); return cols; }
+  /** Lay out columns onto a grid with `rows` rows, turning right (長龍拐彎) when blocked. */
+  function placeGrid(cols, rows) {
+    var occ = {}, cells = [], start = -1;
+    cols.forEach(function (col) {
+      var c = start + 1; while (occ[c + ',0']) c++; start = c;
+      var r = 0, turned = false;
+      col.forEach(function (item, i) {
+        if (i > 0) { if (!turned && r + 1 < rows && !occ[c + ',' + (r + 1)]) r++; else { turned = true; c++; } }
+        occ[c + ',' + r] = 1; cells.push({ c: c, r: r, item: item });
+      });
+    });
+    return cells;
+  }
+  function beadPlate(history, rows) { return history.map(function (h, i) { return { c: Math.floor(i / rows), r: i % rows, item: h }; }); }
+  function roads(history) {
+    var br = bigRoad(history);
+    return { big: br, eye: derived(br.cols, 1), small: derived(br.cols, 2), roach: derived(br.cols, 3) };
+  }
+  /** 問路: colour each derived road would add if next result is Banker / Player */
+  function predict(history) {
+    var cur = roads(history), out = {};
+    ['B', 'P'].forEach(function (w) {
+      var nx = roads(history.concat([{ w: w }]));
+      out[w] = ['eye', 'small', 'roach'].map(function (k) { return nx[k].length > cur[k].length ? nx[k][nx[k].length - 1] : null; });
+    });
+    return out;
+  }
+  function stats(history) {
+    var s = { hands: history.length, B: 0, P: 0, T: 0, bp: 0, pp: 0 };
+    history.forEach(function (h) { s[h.w]++; if (h.bp) s.bp++; if (h.pp) s.pp++; });
+    return s;
+  }
+  var api = { SUITS: SUITS, RANKS: RANKS, RULES: RULES, card: card, parseCard: parseCard, isRed: isRed, cardPoint: cardPoint, burnCount: burnCount,
+    total: total, isNatural: isNatural, playerShouldDraw: playerShouldDraw, bankerShouldDraw: bankerShouldDraw, evaluate: evaluate, playRound: playRound,
+    settle: settle, checkBet: checkBet, Shoe: Shoe, bigRoad: bigRoad, derived: derived, group: group, placeGrid: placeGrid, beadPlate: beadPlate,
+    roads: roads, predict: predict, stats: stats };
+  root.BacCore = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="tracker-core">
+(function (root) {
+  'use strict';
+  var KEY = 'baccaratRoad.v1', MAX_PAST = 50;
+  function now() { return Date.now(); }
+  function mkShoe(no) { return { id: 's' + now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), no: no, started: now(), hands: [] }; }
+  function cleanHand(h) {
+    if (!h || (h.w !== 'B' && h.w !== 'P' && h.w !== 'T')) return null;
+    var o = { w: h.w, bp: !!h.bp, pp: !!h.pp, t: +h.t || 0 }; if (h.s6 && h.w === 'B') o.s6 = true; return o;
+  }
+  function cleanShoe(s) {
+    if (!s || !Array.isArray(s.hands)) return null;
+    var hands = s.hands.map(cleanHand).filter(Boolean);
+    return { id: String(s.id || ('s' + Math.random().toString(36).slice(2))), no: +s.no || 1, started: +s.started || now(), ended: s.ended ? +s.ended : undefined, hands: hands };
+  }
+  /** Validate persisted JSON; returns a sound state or null. */
+  function sanitize(obj) {
+    if (!obj || typeof obj !== 'object' || obj.v !== 1) return null;
+    var cur = cleanShoe(obj.current); if (!cur) return null;
+    var past = Array.isArray(obj.past) ? obj.past.map(cleanShoe).filter(function (s) { return s && s.hands.length; }).slice(0, MAX_PAST) : [];
+    return { v: 1, shoeNo: Math.max(+obj.shoeNo || 1, cur.no), current: cur, past: past, prefs: cleanPrefs(obj.prefs) };
+  }
+  /** Prediction panel prefs: master switch (default on) + per-method switches (missing = on). */
+  function cleanPrefs(p) {
+    var o = { pred: true, m: {} }; if (!p || typeof p !== 'object') return o;
+    if (p.pred === false) o.pred = false;
+    if (p.m && typeof p.m === 'object') Object.keys(p.m).forEach(function (k) { if (/^[a-z]{1,20}$/.test(k)) o.m[k] = p.m[k] !== false; });
+    return o;
+  }
+  function fresh() { return { v: 1, shoeNo: 1, current: mkShoe(1), past: [], prefs: cleanPrefs(null) }; }
+  /** store: { get(): string|null, set(string) } */
+  function Tracker(store) { this.store = store; this.state = this.load(); }
+  Tracker.prototype.load = function () {
+    var raw = null; try { raw = this.store.get(); } catch (e) {}
+    if (raw) { try { var s = sanitize(JSON.parse(raw)); if (s) return s; } catch (e) {} }
+    return fresh();
+  };
+  Tracker.prototype.save = function () { try { this.store.set(JSON.stringify(this.state)); } catch (e) {} };
+  Tracker.prototype.hands = function () { return this.state.current.hands; };
+  Tracker.prototype.add = function (w, flags) {
+    var h = cleanHand({ w: w, bp: flags && flags.bp, pp: flags && flags.pp, s6: flags && flags.s6, t: now() });
+    if (!h) throw new Error('bad result ' + w);
+    this.state.current.hands.push(h); this.save(); return h;
+  };
+  Tracker.prototype.undo = function () { var h = this.state.current.hands.pop() || null; if (h) this.save(); return h; };
+  /** Archive the current shoe (if it has hands) and start a new one. */
+  Tracker.prototype.newShoe = function () {
+    var st = this.state, cur = st.current;
+    if (cur.hands.length) {
+      cur.ended = now(); st.past.unshift(cur); if (st.past.length > MAX_PAST) st.past.length = MAX_PAST;
+      st.shoeNo++; st.current = mkShoe(st.shoeNo);
+    } else { cur.started = now(); }
+    this.save(); return st.current;
+  };
+  Tracker.prototype.getShoe = function (id) { if (this.state.current.id === id) return this.state.current; return this.state.past.filter(function (s) { return s.id === id; })[0] || null; };
+  Tracker.prototype.deleteShoe = function (id) { var n = this.state.past.length; this.state.past = this.state.past.filter(function (s) { return s.id !== id; }); if (this.state.past.length !== n) this.save(); return this.state.past.length !== n; };
+  Tracker.prototype.setPredOn = function (on) { this.state.prefs.pred = !!on; this.save(); };
+  Tracker.prototype.setMethod = function (id, on) { this.state.prefs.m[id] = !!on; this.save(); };
+  Tracker.prototype.clearPast = function () { this.state.past = []; this.save(); };
+  /** Counts, percentages, streaks. Streaks follow the Big Road (ties do not break a streak). */
+  function stats(hands, BC) {
+    var s = { hands: hands.length, B: 0, P: 0, T: 0, bp: 0, pp: 0, s6: 0, pct: { B: 0, P: 0, T: 0 }, longest: { B: 0, P: 0 }, current: null };
+    hands.forEach(function (h) { s[h.w]++; if (h.bp) s.bp++; if (h.pp) s.pp++; if (h.s6) s.s6++; });
+    if (s.hands) ['B', 'P', 'T'].forEach(function (k) { s.pct[k] = Math.round(s[k] / s.hands * 1000) / 10; });
+    var cols = BC.bigRoad(hands).cols;
+    cols.forEach(function (c) { var w = c[0].w; if (c.length > s.longest[w]) s.longest[w] = c.length; });
+    if (cols.length) { var last = cols[cols.length - 1]; s.current = { w: last[0].w, n: last.length }; }
+    return s;
+  }
+  var api = { KEY: KEY, MAX_PAST: MAX_PAST, Tracker: Tracker, sanitize: sanitize, cleanPrefs: cleanPrefs, stats: stats, fresh: fresh };
+  root.TrackerCore = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script id="predict-core">
+(function (root) {
+  'use strict';
+  // 多方面預測 — pattern-reference only. Baccarat hands are essentially independent; none of these beats the house edge.
+  var WINDOW = 12;
+  var METHODS = [
+    { id: 'roads',   name: '下三路問路綜合', short: '下三路', desc: '大眼仔、小路、曱甴路假設下一局為莊時，紅（有規律）多於藍則預測莊，反之預測閒。' },
+    { id: 'follow',  name: '跟龍',           short: '跟龍',   desc: '上兩局（不計和局）相同時，預測延續同一方。' },
+    { id: 'chop',    name: '單跳／切龍',     short: '單跳',   desc: '上兩局（不計和局）不同時，預測繼續跳往另一方。' },
+    { id: 'mirror',  name: '大路排列對稱',   short: '對稱',   desc: '假設大路本行長度與上一行相同：未夠長則延續，已夠長則轉邊。' },
+    { id: 'hot',     name: '冷熱統計（追熱）', short: '追熱', desc: '近 ' + WINDOW + ' 局（不計和局）出現較多的一方。' },
+    { id: 'cold',    name: '冷熱統計（博冷）', short: '博冷', desc: '近 ' + WINDOW + ' 局（不計和局）出現較少的一方。' },
+    { id: 'pattern', name: '模式匹配',       short: '模式',   desc: '取最近 5、4、3 局的排列，在本靴較早位置尋找最後一次相同排列，預測其後的結果。' },
+    { id: 'markov',  name: '馬可夫鏈',       short: '馬可夫', desc: '統計本靴由上一局結果轉至莊或閒的次數，取較多者。' }
+  ];
+  function opp(w) { return w === 'B' ? 'P' : 'B'; }
+  function seqOf(hands) { var s = []; for (var i = 0; i < hands.length; i++) if (hands[i].w !== 'T') s.push(hands[i].w); return s; }
+  function runs(seq) { var c = []; seq.forEach(function (x) { if (!c.length || c[c.length - 1].w !== x) c.push({ w: x, n: 0 }); c[c.length - 1].n++; }); return c; }
+  // Each predictor: (hands, seq, BC) -> 'B' | 'P' | null (null = 觀望)
+  var F = {
+    roads: function (hands, seq, BC) {
+      if (!BC || !seq.length) return null;
+      var r = 0, b = 0; BC.predict(hands).B.forEach(function (c) { if (c === 'R') r++; else if (c === 'B') b++; });
+      return r > b ? 'B' : b > r ? 'P' : null;
+    },
+    follow: function (h, seq) { var n = seq.length; return n >= 2 && seq[n - 1] === seq[n - 2] ? seq[n - 1] : null; },
+    chop: function (h, seq) { var n = seq.length; return n >= 2 && seq[n - 1] !== seq[n - 2] ? opp(seq[n - 1]) : null; },
+    mirror: function (h, seq) {
+      var c = runs(seq); if (c.length < 2) return null;
+      var cur = c[c.length - 1], prev = c[c.length - 2];
+      return cur.n < prev.n ? cur.w : opp(cur.w);
+    },
+    hot: function (h, seq) { return freq(seq, true); },
+    cold: function (h, seq) { return freq(seq, false); },
+    pattern: function (h, seq) {
+      var n = seq.length;
+      for (var k = 5; k >= 3; k--) {
+        if (n < k + 1) continue;
+        var pat = seq.slice(n - k).join('');
+        for (var i = n - k - 1; i >= 0; i--) if (seq.slice(i, i + k).join('') === pat) return seq[i + k];
+      }
+      return null;
+    },
+    markov: function (h, seq) {
+      var n = seq.length; if (n < 3) return null;
+      var last = seq[n - 1], t = { B: 0, P: 0 };
+      for (var i = 1; i < n; i++) if (seq[i - 1] === last) t[seq[i]]++;
+      return t.B > t.P ? 'B' : t.P > t.B ? 'P' : null;
+    }
+  };
+  function freq(seq, hot) {
+    var rec = seq.slice(-WINDOW); if (rec.length < 6) return null;
+    var b = rec.filter(function (x) { return x === 'B'; }).length, p = rec.length - b;
+    if (b === p) return null; var more = b > p ? 'B' : 'P'; return hot ? more : opp(more);
+  }
+  function enabledIds(enabled) { return METHODS.filter(function (m) { return !enabled || enabled[m.id] !== false; }).map(function (m) { return m.id; }); }
+  /** Majority vote of the picks (nulls abstain). */
+  function combine(picks) {
+    var v = { B: 0, P: 0 }; picks.forEach(function (p) { if (p) v[p]++; });
+    return { B: v.B, P: v.P, pick: v.B > v.P ? 'B' : v.P > v.B ? 'P' : null };
+  }
+  /** Suggestions for the next hand. enabled: {id: bool} (missing = on). */
+  function predict(hands, BC, enabled) {
+    var seq = seqOf(hands), ids = enabledIds(enabled), picks = {};
+    METHODS.forEach(function (m) { picks[m.id] = F[m.id](hands, seq, BC); });
+    return { picks: picks, vote: combine(ids.map(function (id) { return picks[id]; })) };
+  }
+  /** Walk-forward hit tracking within a shoe: before every non-tie hand, ask each method; ties are skipped. */
+  function track(hands, BC, enabled) {
+    var ids = enabledIds(enabled), r = { combined: { hits: 0, total: 0 } };
+    METHODS.forEach(function (m) { r[m.id] = { hits: 0, total: 0 }; });
+    for (var i = 0; i < hands.length; i++) {
+      var w = hands[i].w; if (w === 'T') continue;
+      var p = predict(hands.slice(0, i), BC, enabled);
+      METHODS.forEach(function (m) { var x = p.picks[m.id]; if (x) { r[m.id].total++; if (x === w) r[m.id].hits++; } });
+      if (ids.length && p.vote.pick) { r.combined.total++; if (p.vote.pick === w) r.combined.hits++; }
+    }
+    Object.keys(r).forEach(function (k) { r[k].pct = r[k].total ? Math.round(r[k].hits / r[k].total * 1000) / 10 : null; });
+    return r;
+  }
+  var NOTE = '以上只屬路紙規律參考。百家樂每局結果基本上互相獨立，任何預測方法均無法抵銷莊家優勢（莊約 1.06%、閒約 1.24%），請量力而為。';
+  var api = { METHODS: METHODS, F: F, WINDOW: WINDOW, seqOf: seqOf, combine: combine, predict: predict, track: track, NOTE: NOTE };
+  root.PredictCore = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+(function () {
+'use strict';
+var BC = window.BacCore, TC = window.TrackerCore, PC = window.PredictCore;
+var $ = function (id) { return document.getElementById(id); };
+var COL = { B: '#d7263d', P: '#1e5bd8', T: '#1f9d4c' }, NAME = { B: '莊', P: '閒', T: '和' };
+var bridge = window.AndroidBridge;
+var store = {
+  get: function () { var v = null; if (bridge) { try { v = bridge.load(); } catch (e) {} } if (!v) { try { v = localStorage.getItem(TC.KEY); } catch (e) {} } return v; },
+  set: function (s) { try { localStorage.setItem(TC.KEY, s); } catch (e) {} if (bridge) { try { bridge.save(s); } catch (e) {} } }
+};
+var T = new TC.Tracker(store);
+var UI = window.RoadApp = { T: T, flags: { bp: false, pp: false, s6: false }, viewId: null, preview: null, c: 20 };
+
+function vib(ms) { try { if (bridge && bridge.vibrate) bridge.vibrate(ms); else if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+var toastT; function toast(t) { var el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove('show'); }, 1300); }
+function fmtDate(ts) { var d = new Date(ts), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+function shownShoe() { return UI.viewId ? T.getShoe(UI.viewId) || T.state.current : T.state.current; }
+
+// ---------------- sizing ----------------
+function landscape() { return window.matchMedia('(orientation:landscape) and (max-height:560px)').matches; }
+function sizeBoard() {
+  var b = $('board'), W = b.clientWidth - 12, H = b.clientHeight - 10, c;
+  if (landscape()) {
+    c = Math.floor(Math.min((H - 8) / 9, W / 24)); c = Math.max(12, Math.min(28, c));
+    var beadCols = Math.max(6, Math.min(10, Math.floor(W * 0.34 / c)));
+    $('rBead').style.width = (beadCols * c) + 'px';
+    setH(['rBead', 'rBig'], 6 * c); setH(['rEye', 'rSmall', 'rRoach'], 3 * c);
+  } else {
+    var cb; c = Math.floor(Math.min(W / 17, (H - 16) / 18.6)); c = Math.max(10, Math.min(26, c)); cb = Math.round(c * 1.1);
+    $('rBead').style.width = '';
+    setH(['rBig'], 6 * c); setH(['rBead'], 6 * cb); setH(['rEye', 'rSmall', 'rRoach'], 3 * c); UI.cb = cb;
+  }
+  UI.c = c; if (landscape()) UI.cb = c;
+}
+function setH(ids, h) { ids.forEach(function (id) { $(id).style.height = (h + 2) + 'px'; }); }
+
+// ---------------- roads ----------------
+function gridBg(svgCell) { return 'background-image:linear-gradient(#d0d0d0 1px,transparent 1px),linear-gradient(90deg,#d0d0d0 1px,transparent 1px);background-size:' + svgCell + 'px ' + svgCell + 'px'; }
+function drawRoad(id, cells, s, gridCell, drawFn) {
+  var el = $(id), sc = el.querySelector('.sc'), cw = sc.clientWidth, n = Math.max(1, Math.floor(cw / s));
+  var maxC = cells.reduce(function (a, x) { return Math.max(a, x.c); }, -1);
+  var k = Math.max(0, maxC + 2 - n);                       // first column shown so the latest (+1 spare) is visible
+  var cols = Math.max(maxC + 3, k + Math.ceil(cw / s) + 1), w = cols * s, h = 6 * s, out = '';
+  cells.forEach(function (x, i) { out += drawFn(x, (x.c + 0.5) * s, (x.r + 0.5) * s, s, i); });
+  sc.innerHTML = '<svg width="' + w + '" height="' + h + '" style="' + gridBg(gridCell) + '">' + out + '</svg>';
+  sc.scrollLeft = k * s;
+}
+function pairDots(cx, cy, s, it) {
+  var h = '';
+  if (it.bp) h += '<circle cx="' + (cx - s * 0.3) + '" cy="' + (cy - s * 0.3) + '" r="' + (s * 0.13) + '" fill="' + COL.B + '" stroke="#fff" stroke-width="1"/>';
+  if (it.pp) h += '<circle cx="' + (cx + s * 0.3) + '" cy="' + (cy + s * 0.3) + '" r="' + (s * 0.13) + '" fill="' + COL.P + '" stroke="#fff" stroke-width="1"/>';
+  return h;
+}
+function renderRoads() {
+  var shoe = shownShoe(), hands = shoe.hands.slice(), pv = UI.preview && !UI.viewId ? UI.preview : null;
+  var base = BC.roads(hands);
+  if (pv) hands.push({ w: pv, preview: true });
+  var last = hands.length - 1, rd = pv ? BC.roads(hands) : base, c = UI.c, cb = UI.cb || c;
+  var cls = function (isLast, item) { return isLast ? (item && item.preview ? ' class="pv"' : UI.justAdded ? ' class="nw"' : '') : ''; };
+  // bead plate
+  drawRoad('rBead', BC.beadPlate(hands, 6), cb, cb, function (x, cx, cy, s, i) {
+    var it = x.item, ch = it.s6 ? '6' : NAME[it.w];
+    return '<g' + cls(i === last, it) + '><circle cx="' + cx + '" cy="' + cy + '" r="' + (s * 0.43) + '" fill="' + COL[it.w] + '"' + (it.s6 ? ' stroke="#f2c230" stroke-width="' + (s * 0.1) + '"' : '') + '/>' +
+      '<text x="' + cx + '" y="' + (cy + s * 0.18) + '" text-anchor="middle" font-size="' + (s * 0.5) + '" font-weight="800" fill="#fff">' + ch + '</text>' + pairDots(cx, cy, s, it) + '</g>';
+  });
+  // big road
+  var bigCells = BC.placeGrid(rd.big.cols, 6), lastCell = bigCells[bigCells.length - 1];
+  drawRoad('rBig', bigCells, c, c, function (x, cx, cy, s) {
+    var it = x.item, ties = it.ties + (it.leadTies || 0), isLast = x === lastCell && (it.i === last || hands[last].w === 'T');
+    var h = '<g' + cls(isLast, isLast ? hands[last] : null) + '><circle cx="' + cx + '" cy="' + cy + '" r="' + (s * 0.36) + '" fill="none" stroke="' + COL[it.w] + '" stroke-width="' + (s * 0.13) + '"/>';
+    if (hands[it.i] && hands[it.i].s6) h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (s * 0.12) + '" fill="#e0a526"/>';
+    if (ties) h += '<line x1="' + (cx + s * 0.34) + '" y1="' + (cy - s * 0.34) + '" x2="' + (cx - s * 0.34) + '" y2="' + (cy + s * 0.34) + '" stroke="' + COL.T + '" stroke-width="' + (s * 0.12) + '"/>' +
+      (ties > 1 ? '<text x="' + cx + '" y="' + (cy + s * 0.17) + '" text-anchor="middle" font-size="' + (s * 0.48) + '" font-weight="900" fill="' + COL.T + '">' + ties + '</text>' : '');
+    return h + pairDots(cx, cy, s, it) + '</g>';
+  });
+  // derived roads
+  [['rEye', 'eye', 'ring'], ['rSmall', 'small', 'dot'], ['rRoach', 'roach', 'slash']].forEach(function (a) {
+    var seq = rd[a[1]], grew = pv && seq.length > base[a[1]].length, cells = BC.placeGrid(BC.group(seq), 6), s = c / 2;
+    drawRoad(a[0], cells, s, c, function (x, cx, cy, ss, i) {
+      var col = x.item === 'R' ? COL.B : COL.P, k = grew && i === cells.length - 1 ? ' class="pv"' : '';
+      if (a[2] === 'ring') return '<circle' + k + ' cx="' + cx + '" cy="' + cy + '" r="' + (ss * 0.34) + '" fill="none" stroke="' + col + '" stroke-width="' + (ss * 0.18) + '"/>';
+      if (a[2] === 'dot') return '<circle' + k + ' cx="' + cx + '" cy="' + cy + '" r="' + (ss * 0.38) + '" fill="' + col + '"/>';
+      return '<line' + k + ' x1="' + (cx - ss * 0.36) + '" y1="' + (cy + ss * 0.36) + '" x2="' + (cx + ss * 0.36) + '" y2="' + (cy - ss * 0.36) + '" stroke="' + col + '" stroke-width="' + (ss * 0.22) + '" stroke-linecap="round"/>';
+    });
+  });
+}
+function askIcon(kind, c) {
+  var col = c === 'R' ? COL.B : c === 'B' ? COL.P : '#999', inner;
+  if (!c) inner = '<line x1="5" y1="9" x2="13" y2="9" stroke="#999" stroke-width="2"/>';
+  else if (kind === 0) inner = '<circle cx="9" cy="9" r="6" fill="none" stroke="' + col + '" stroke-width="3"/>';
+  else if (kind === 1) inner = '<circle cx="9" cy="9" r="7" fill="' + col + '"/>';
+  else inner = '<line x1="3" y1="15" x2="15" y2="3" stroke="' + col + '" stroke-width="3.5" stroke-linecap="round"/>';
+  return '<svg width="18" height="18" viewBox="0 0 18 18">' + inner + '</svg>';
+}
+function renderStats() {
+  var shoe = shownShoe(), s = TC.stats(shoe.hands, BC), pr = BC.predict(shoe.hands);
+  var cur = s.current ? NAME[s.current.w] + ' ' + s.current.n + ' 連' : '—';
+  $('counts').innerHTML =
+    '<div class="r"><span class="sm">局數</span><b>' + s.hands + '</b>' +
+    '<span><span class="dot B">莊</span><b>' + s.B + '</b> <span class="sm">' + s.pct.B + '%</span></span>' +
+    '<span><span class="dot P">閒</span><b>' + s.P + '</b> <span class="sm">' + s.pct.P + '%</span></span>' +
+    '<span><span class="dot T">和</span><b>' + s.T + '</b> <span class="sm">' + s.pct.T + '%</span></span></div>' +
+    '<div class="r"><span class="sm">莊對</span><b>' + s.bp + '</b><span class="sm">閒對</span><b>' + s.pp + '</b><span class="sm">幸運6</span><b>' + s.s6 + '</b></div>' +
+    '<div class="r"><span class="sm">最長</span>莊 <b>' + s.longest.B + '</b> 閒 <b>' + s.longest.P + '</b><span class="sm">現時</span><b>' + cur + '</b></div>';
+  $('askB').innerHTML = '莊問路 ' + pr.B.map(function (c, i) { return askIcon(i, c); }).join('');
+  $('askP').innerHTML = '閒問路 ' + pr.P.map(function (c, i) { return askIcon(i, c); }).join('');
+  $('askB').classList.toggle('on', UI.preview === 'B'); $('askP').classList.toggle('on', UI.preview === 'P');
+  $('shoeInfo').textContent = '第 ' + shoe.no + ' 靴 · ' + s.hands + ' 局' + (UI.viewId ? '' : ' · ' + fmtDate(shoe.started));
+  document.body.classList.toggle('viewing', !!UI.viewId);
+  $('ban').classList.toggle('show', !!UI.viewId);
+  if (UI.viewId) $('banTxt').textContent = '檢視第 ' + shoe.no + ' 靴紀錄（唯讀） · ' + fmtDate(shoe.started);
+  $('bUndo').disabled = !T.hands().length || !!UI.viewId;
+  document.querySelectorAll('.tg').forEach(function (b) { b.classList.toggle('on', !!UI.flags[b.dataset.f]); });
+}
+// ---------------- 多方面預測 ----------------
+function pk(w) { return '<span class="pk ' + (w || 'N') + '">' + (w ? NAME[w] : '觀望') + '</span>'; }
+function pctTxt(r) { return r.total ? r.hits + '/' + r.total + ' ' + r.pct + '%' : '—'; }
+function predData() {
+  var shoe = shownShoe(), en = T.state.prefs.m;
+  return { en: en, p: PC.predict(shoe.hands, BC, en), tr: PC.track(shoe.hands, BC, en) };
+}
+function renderPred() {
+  var on = T.state.prefs.pred;
+  $('pred').classList.toggle('off', !on); $('pSw').classList.toggle('on', on); $('pSw2').classList.toggle('on', on);
+  if (!on) { $('pSum').textContent = '已關閉'; $('pChips').innerHTML = ''; if ($('pcfg').classList.contains('show')) renderPredCfg(); return; }
+  var d = predData(), v = d.p.vote, anyOn = PC.METHODS.some(function (m) { return d.en[m.id] !== false; });
+  $('pSum').innerHTML = anyOn ? '綜合 ' + pk(v.pick) + '<small>莊 ' + v.B + '：閒 ' + v.P + ' · 命中 ' + pctTxt(d.tr.combined) + '</small>' : '<small>未選取任何方法</small>';
+  $('pChips').innerHTML = PC.METHODS.map(function (m) {
+    var off = d.en[m.id] === false, r = d.tr[m.id];
+    return '<button class="chip' + (off ? ' off' : '') + '" data-id="' + m.id + '"><span class="cn">' + m.short + '</span><span class="cv">' + (off ? '<span class="hr">關</span>' : pk(d.p.picks[m.id]) + '<span class="hr">' + (r.total ? r.pct + '%' : '—') + '</span>') + '</span></button>';
+  }).join('');
+  if ($('pcfg').classList.contains('show')) renderPredCfg(d);
+}
+function renderPredCfg(d) {
+  d = d || predData(); var on = T.state.prefs.pred;
+  $('pSw2').classList.toggle('on', on);
+  var h = '<div class="pm all"><span></span><span class="nm">綜合投票</span><span class="rt">' + pk(d.p.vote.pick) + ' <small>莊 ' + d.p.vote.B + '：閒 ' + d.p.vote.P + '</small><br><small>本靴命中</small> ' + pctTxt(d.tr.combined) + '</span><span class="ds">已開啟方法的多數票；票數相同則觀望。</span></div>';
+  PC.METHODS.forEach(function (m) {
+    var off = d.en[m.id] === false;
+    h += '<div class="pm' + (off ? ' off' : '') + '"><button class="sw' + (off ? '' : ' on') + '" data-id="' + m.id + '" aria-label="' + m.name + '"><i></i></button><span class="nm">' + m.name + '</span>' +
+      '<span class="rt">' + pk(d.p.picks[m.id]) + '<br><small>命中</small> ' + pctTxt(d.tr[m.id]) + '</span><span class="ds">' + m.desc + '</span></div>';
+  });
+  $('pList').innerHTML = h; $('pDisc').textContent = PC.NOTE;
+}
+function openPredCfg() { renderPredCfg(); $('pcfg').classList.add('show'); }
+function setPredOn(on) { T.setPredOn(on); vib(12); render(); }
+function openAbout() {
+  $('aBody').innerHTML =
+    '<h4>記錄</h4><ul><li>按「莊」「閒」「和」記錄每局結果；如有莊對、閒對或幸運6（超級6，只適用於莊贏），請先按對應鍵，再按結果。</li><li>「撤銷」刪除最後一局；「新靴」把本靴存入紀錄並重新開始。</li><li>所有紀錄只儲存在本機，離線亦可使用。</li></ul>' +
+    '<h4>路紙</h4><ul><li>珠盤路、大路（綠斜線及數字代表和局，紅點莊對、藍點閒對）、大眼仔、小路、曱甴路，與澳門電子路紙相同。</li><li>按住「莊問路」或「閒問路」，路紙會閃示下一局若為莊或閒時各路新增的標記；輕按則顯示 1.5 秒。</li></ul>' +
+    '<h4>多方面預測</h4><ul>' + PC.METHODS.map(function (m) { return '<li><b>' + m.name + '</b>：' + m.desc + '</li>'; }).join('') +
+    '<li>命中率為本靴內逐局回測（不計和局及觀望）。可在預測面板按「詳情」逐項開關，或關閉整個面板。</li></ul>' +
+    '<p class="disc">' + PC.NOTE + '</p><div style="color:#9c8b6a;font-size:12px">百家樂記路 1.0.0 · 只供記錄及娛樂參考</div>';
+  $('about').classList.add('show');
+}
+function render() { renderPred(); sizeBoard(); renderRoads(); renderStats(); UI.justAdded = false; }
+
+// ---------------- actions ----------------
+function add(w) {
+  if (UI.viewId) return;
+  var f = UI.flags; T.add(w, { bp: f.bp, pp: f.pp, s6: f.s6 && w === 'B' });
+  if (f.s6 && w !== 'B') toast('幸運6 只適用於莊贏');
+  UI.flags = { bp: false, pp: false, s6: false }; UI.justAdded = true; vib(18); render();
+}
+function undo() { if (UI.viewId) return; var h = T.undo(); if (h) { vib(30); toast('已撤銷：' + NAME[h.w] + (h.bp ? '・莊對' : '') + (h.pp ? '・閒對' : '')); } render(); }
+function ask(title, text, okTxt) {
+  return new Promise(function (res) {
+    $('cTitle').textContent = title; $('cText').textContent = text; $('cYes').textContent = okTxt || '確定'; $('confirm').classList.add('show');
+    UI.confirmCb = function (v) { $('confirm').classList.remove('show'); UI.confirmCb = null; res(v); };
+  });
+}
+function newShoe() {
+  var n = T.hands().length;
+  ask('開始新靴？', n ? '本靴共 ' + n + ' 局，將存入牌靴紀錄，路紙重新開始。' : '本靴尚未有紀錄，將重新開始計時。', '開始新靴').then(function (ok) {
+    if (!ok) return; T.newShoe(); UI.viewId = null; UI.preview = null; vib(40); toast('已開始第 ' + T.state.current.no + ' 靴'); render();
+  });
+}
+function renderHist() {
+  var st = T.state, list = [st.current].concat(st.past), h = '';
+  list.forEach(function (s) {
+    var k = TC.stats(s.hands, BC), cur = s === st.current;
+    h += '<div class="hi' + (cur ? ' cur' : '') + '" data-id="' + s.id + '"><div class="info"><b>第 ' + s.no + ' 靴</b><div>' + fmtDate(s.started) + ' · ' + k.hands + ' 局 · 莊 ' + k.B + ' 閒 ' + k.P + ' 和 ' + k.T + '</div></div>' +
+      (cur ? '' : '<button class="del">刪除</button>') + '</div>';
+  });
+  if (!st.past.length) h += '<div class="empty">尚未有已完成的牌靴</div>';
+  $('histList').innerHTML = h;
+}
+function openHist() { renderHist(); $('hist').classList.add('show'); }
+function viewShoe(id) { UI.viewId = id === T.state.current.id ? null : id; UI.preview = null; $('hist').classList.remove('show'); render(); }
+
+// 問路 preview: press and hold (or tap for 1.5 s)
+function bindAsk(btn) {
+  var w = btn.dataset.w, down = 0, tmr;
+  function on() { if (UI.viewId) return; clearTimeout(tmr); UI.preview = w; vib(10); render(); }
+  function off() { UI.preview = null; render(); }
+  btn.addEventListener('pointerdown', function (e) { e.preventDefault(); down = Date.now(); on(); });
+  btn.addEventListener('pointerup', function () { if (Date.now() - down < 300) { tmr = setTimeout(off, 1500); } else off(); });
+  btn.addEventListener('pointerleave', function () { if (down && Date.now() - down >= 300 && UI.preview === w) off(); });
+  btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+}
+
+// ---------------- wiring ----------------
+document.querySelectorAll('.big').forEach(function (b) { b.addEventListener('click', function () { add(b.dataset.w); }); });
+document.querySelectorAll('.tg').forEach(function (b) { b.addEventListener('click', function () { if (UI.viewId) return; UI.flags[b.dataset.f] = !UI.flags[b.dataset.f]; vib(8); renderStats(); }); });
+$('bUndo').onclick = undo; $('bNew').onclick = newShoe; $('bHist').onclick = openHist;
+$('bBack').onclick = function () { UI.viewId = null; render(); };
+$('cYes').onclick = function () { UI.confirmCb && UI.confirmCb(true); }; $('cNo').onclick = function () { UI.confirmCb && UI.confirmCb(false); };
+$('bAbout').onclick = openAbout; $('aClose').onclick = function () { $('about').classList.remove('show'); };
+$('pSw').onclick = function (e) { e.stopPropagation(); setPredOn(!T.state.prefs.pred); };
+$('pSw2').onclick = function () { setPredOn(!T.state.prefs.pred); };
+$('pred').addEventListener('click', function (e) { if (e.target.closest('#pSw')) return; if (!T.state.prefs.pred) { setPredOn(true); return; } openPredCfg(); });
+$('pList').addEventListener('click', function (e) { var b = e.target.closest('.sw'); if (!b) return; T.setMethod(b.dataset.id, !b.classList.contains('on')); vib(8); render(); });
+$('pClose').onclick = function () { $('pcfg').classList.remove('show'); };
+$('hClose').onclick = function () { $('hist').classList.remove('show'); };
+$('hClear').onclick = function () {
+  if (!T.state.past.length) return;
+  $('hist').classList.remove('show');
+  ask('清除全部紀錄？', '已完成的 ' + T.state.past.length + ' 靴紀錄將被永久刪除（本靴不受影響）。', '清除').then(function (ok) { if (ok) { T.clearPast(); UI.viewId = null; toast('已清除牌靴紀錄'); render(); } });
+};
+$('histList').addEventListener('click', function (e) {
+  var row = e.target.closest('.hi'); if (!row) return;
+  if (e.target.classList.contains('del')) { T.deleteShoe(row.dataset.id); if (UI.viewId === row.dataset.id) UI.viewId = null; renderHist(); render(); return; }
+  viewShoe(row.dataset.id);
+});
+bindAsk($('askB')); bindAsk($('askP'));
+document.addEventListener('keydown', function (e) {
+  if (e.repeat || e.metaKey || e.ctrlKey) return; var k = e.key.toLowerCase();
+  if ($('confirm').classList.contains('show')) { if (k === 'enter') $('cYes').click(); else if (k === 'escape') $('cNo').click(); return; }
+  if (k === 'b') add('B'); else if (k === 'p') add('P'); else if (k === 't') add('T'); else if (k === 'z' || k === 'backspace') undo();
+});
+// Android back button: close dialogs / leave read-only view first
+window.onAndroidBack = function () {
+  if ($('confirm').classList.contains('show')) { $('cNo').click(); return true; }
+  var ovs = ['hist', 'pcfg', 'about'];
+  for (var i = 0; i < ovs.length; i++) if ($(ovs[i]).classList.contains('show')) { $(ovs[i]).classList.remove('show'); return true; }
+  if (UI.viewId) { UI.viewId = null; render(); return true; }
+  if (UI.preview) { UI.preview = null; render(); return true; }
+  return false;
+};
+var rz; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(render, 60); });
+UI.render = render; UI.add = add; UI.undo = undo;
+render();
+})();
+</script>
+<script id="pwa-hooks">/* road PWA hooks: nothing to unlock; vibration is simply unavailable on iOS (app checks navigator.vibrate). */
+window.PWA_CFG = {};
+</script>
+<script id="pwa-ios">/* iOS / PWA glue: service worker, persistent storage, gesture hygiene, WebAudio unlock, screen wake lock. */
+(function () {
+  'use strict';
+  var CFG = window.PWA_CFG || {}, d = document;
+  var standalone = !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches));
+  d.documentElement.classList.toggle('standalone', standalone);
+  // --- offline: service worker (http/https only) ---
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js', { scope: './' }).then(function (r) { window.__swReg = r; }).catch(function () {});
+    });
+  }
+  // --- ask the browser not to evict localStorage / caches ---
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(function (p) { if (!p) return navigator.storage.persist(); }).catch(function () {}); } catch (e) {}
+  // --- no pinch / double-tap zoom, no rubber-band on non-scrolling areas ---
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) { d.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false }); });
+  d.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+  function scrollable(el, dx, dy) {
+    for (; el && el !== d.body && el.nodeType === 1; el = el.parentNode) {
+      var s = getComputedStyle(el);
+      if (dy && /(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1) return true;
+      if (dx && /(auto|scroll)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1) return true;
+    }
+    return false;
+  }
+  var t0 = null;
+  d.addEventListener('touchstart', function (e) { t0 = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+  d.addEventListener('touchmove', function (e) {
+    if (e.touches.length > 1) { e.preventDefault(); return; }
+    if (!t0 || !e.cancelable) return;
+    var dx = Math.abs(e.touches[0].clientX - t0.x), dy = Math.abs(e.touches[0].clientY - t0.y);
+    if (e.target.closest && e.target.closest('.sq-card')) return;              // 眯牌 drag handles itself
+    if (!scrollable(e.target, dx > dy, dy >= dx)) e.preventDefault();
+  }, { passive: false });
+  d.addEventListener('contextmenu', function (e) { if (!e.target.closest || !e.target.closest('input,textarea')) e.preventDefault(); });
+
+  // --- WebAudio: iOS only starts audio from inside a user gesture ---
+  if (CFG.audio) {
+    var EV = ['touchend', 'pointerup', 'click', 'keydown'];
+    var unlock = function () {
+      var a = null; try { a = CFG.audio(); } catch (e) {}
+      if (!a) return;
+      try {
+        if (a.state !== 'running') a.resume();
+        var b = a.createBuffer(1, 1, 22050), s = a.createBufferSource(); s.buffer = b; s.connect(a.destination); s.start(0);
+      } catch (e) {}
+      setTimeout(function () { if (a.state === 'running') EV.forEach(function (t) { d.removeEventListener(t, unlock, true); }); }, 0);
+    };
+    var arm = function () { EV.forEach(function (t) { d.addEventListener(t, unlock, true); }); };
+    arm();
+    d.addEventListener('visibilitychange', function () { if (!d.hidden) arm(); });   // after calls / background iOS suspends ("interrupted")
+    window.__audioUnlock = unlock;
+  }
+  // --- keep the screen awake while seated at a table (iOS 16.4+ / Chrome) ---
+  if (CFG.wake) {
+    var lock = null, want = false;
+    var apply = function () {
+      if (!('wakeLock' in navigator)) return;
+      if (want && !lock && !d.hidden) navigator.wakeLock.request('screen').then(function (l) { lock = l; l.addEventListener('release', function () { if (lock === l) lock = null; }); }).catch(function () {});
+      if (!want && lock) { var l = lock; lock = null; l.release().catch(function () {}); }
+    };
+    window.__wake = function (on) { want = !!on; apply(); return want; };
+    d.addEventListener('visibilitychange', apply);
+    CFG.wake(window.__wake);
+  }
+})();
+</script>
+</body></html>
