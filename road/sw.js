@@ -1,5 +1,5 @@
 /* Offline service worker for 百家樂記路 (cache-first, versioned). */
-var PREFIX = 'road-', CACHE = PREFIX + '944161e09242';
+var PREFIX = 'road-', CACHE = PREFIX + '71b9ceb162e1';
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));

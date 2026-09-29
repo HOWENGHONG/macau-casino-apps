@@ -1,5 +1,5 @@
 /* Offline service worker for 澳門娛樂場 (cache-first, versioned). */
-var PREFIX = 'casino-', CACHE = PREFIX + '022439df1e11';
+var PREFIX = 'casino-', CACHE = PREFIX + '4695c855b0a8';
 var ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
