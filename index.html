@@ -1,57 +1,227 @@
 <!DOCTYPE html>
-<html lang="zh-HK"><head><meta charset="utf-8">
+<html lang="zh-Hant-HK"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a0b08">
+<meta name="description" content="澳門娛樂場（21點、百家樂、各式撲克及朋友同枱）與百家樂記路：Android 應用程式下載及 iPhone 網頁應用程式安裝。">
 <link rel="apple-touch-icon" href="casino-icon.png">
 <link rel="icon" type="image/png" href="casino-icon.png">
-<title>澳門娛樂場 · 百家樂記路</title>
+<title>澳門娛樂場 · 百家樂記路｜下載及安裝</title>
 <style>
-:root{--gold:#e9c46a;--gold2:#f7dc8f}
+:root{--gold:#e9c46a;--gold2:#f7dc8f;--ink:#f3e6cc;--mute:#cdb98f;--card:rgba(0,0,0,.38);--line:rgba(233,196,106,.35)}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,rgba(233,196,106,.18),transparent 60%),#150709;color:#f3e6cc;
-  font-family:"Noto Sans TC","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6;
-  padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-main{max-width:720px;margin:0 auto}
-h1{color:var(--gold2);text-align:center;letter-spacing:6px;margin:10px 0 4px;font-size:30px}
-.sub{text-align:center;color:#cdb98f;margin:0 0 22px;font-size:14px}
-.apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-a.app{display:flex;gap:14px;align-items:center;padding:14px;border-radius:16px;border:2px solid var(--gold);background:linear-gradient(#2b1409,#170a04);color:inherit;text-decoration:none}
-a.app img{width:72px;height:72px;border-radius:16px;flex:none}
-a.app b{font-size:22px;color:var(--gold2);display:block}
-a.app span{font-size:13px;color:#d8c7a2}
-section{margin-top:22px;background:rgba(0,0,0,.35);border:1px solid rgba(233,196,106,.35);border-radius:14px;padding:14px 18px}
-h2{margin:0 0 6px;color:var(--gold2);font-size:18px}
-ol{margin:6px 0;padding-left:22px}li{margin:4px 0}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,rgba(233,196,106,.18),transparent 60%),#150709;color:var(--ink);
+  font-family:"Noto Sans TC","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;line-height:1.65;-webkit-text-size-adjust:100%;
+  padding:max(18px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+main{max-width:980px;margin:0 auto}
+a{color:var(--gold2)}
+h1{color:var(--gold2);text-align:center;letter-spacing:4px;margin:6px 0 2px;font-size:clamp(24px,6vw,34px)}
+.sub{text-align:center;color:var(--mute);margin:0 0 14px;font-size:14px}
+.hero{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 18px}
+.hero .dev{font-size:15px}
+.hero .dev b{color:var(--gold2)}
+.jump{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.jump a{display:flex;gap:8px;align-items:center;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;color:var(--ink);font-size:14px;background:rgba(233,196,106,.06)}
+.jump img{width:28px;height:28px;border-radius:8px}
+.qr{text-align:center;font-size:12px;color:var(--mute);width:156px}
+.qr svg{display:block;width:140px;height:140px;margin:0 auto 4px;border-radius:8px}
+section.app{margin-top:22px;background:linear-gradient(rgba(43,20,9,.9),rgba(23,10,4,.9));border:2px solid var(--gold);border-radius:18px;padding:16px 18px;scroll-margin-top:12px}
+.app-h{display:flex;gap:14px;align-items:center}
+.app-h img{width:68px;height:68px;border-radius:16px;flex:none}
+.app-h h2{margin:0;color:var(--gold2);font-size:24px;letter-spacing:2px}
+.app-h p{margin:0;color:#d8c7a2;font-size:14px}
+.ver{display:inline-block;margin-left:6px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--gold);vertical-align:middle;letter-spacing:0}
+ul.feat{margin:10px 0 8px;padding-left:20px;font-size:14px}ul.feat li{margin:2px 0}
+.shots{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 10px;margin:4px -4px 0;-webkit-overflow-scrolling:touch}
+.shots a{flex:none;scroll-snap-align:start;display:block}
+.shots img{display:block;border-radius:10px;border:1px solid var(--line);background:#000}
+.shots.land img{height:190px;width:auto}
+.shots.port img{height:340px;width:auto}
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:8px}
+.btn{position:relative;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;text-decoration:none;color:var(--ink);border:2px solid #6d5427;background:#1f120a;transition:transform .1s}
+.btn:active{transform:scale(.98)}
+.btn .ic{font-size:26px;width:34px;text-align:center;flex:none}
+.btn b{display:block;font-size:17px;color:var(--gold2)}
+.btn small{display:block;font-size:12px;color:var(--mute)}
+.btn .rec{display:none;position:absolute;top:-10px;right:10px;background:#c0392b;color:#fff;font-size:11px;padding:1px 8px;border-radius:999px;letter-spacing:1px}
+body.is-android .btn.android,body.is-ios .btn.ios{border-color:var(--gold2);background:linear-gradient(#5a3a10,#2a1706);box-shadow:0 0 0 3px rgba(247,220,143,.25),0 6px 18px rgba(0,0,0,.5)}
+body.is-android .btn.android .rec,body.is-ios .btn.ios .rec{display:block}
+body.is-android .btn.ios,body.is-ios .btn.android{opacity:.62}
+body.is-android .qr,body.is-ios .qr{display:none}
+body.is-android .hero,body.is-ios .hero{grid-template-columns:1fr}
+details.file{margin-top:10px;font-size:13px;color:#d8c7a2}
+details.file summary{cursor:pointer;color:var(--gold)}
+details.file table{border-collapse:collapse;margin-top:6px;width:100%}
+details.file td{padding:3px 6px;border-top:1px solid rgba(233,196,106,.15);vertical-align:top}
+details.file td:first-child{white-space:nowrap;color:var(--mute);width:88px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;color:#f7e7c0}
+section.help{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;scroll-margin-top:12px}
+section.help h2{margin:0 0 6px;color:var(--gold2);font-size:19px}
+body.is-android #android-help,body.is-ios #ios-help{border:2px solid var(--gold2)}
+ol,ul{margin:6px 0;padding-left:22px}li{margin:4px 0}
 .note{font-size:13px;color:#bda57a}
 kbd{display:inline-block;border:1px solid #a07b3a;border-radius:6px;padding:0 6px;background:#2a1a0c;font-family:inherit}
+footer{margin:26px 0 6px;text-align:center;font-size:12px;color:#a08b64}
+dialog{max-width:min(440px,92vw);border:2px solid var(--gold);border-radius:18px;background:#1d0e07;color:var(--ink);padding:18px 20px}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+dialog h3{margin:0 0 6px;color:var(--gold2)}
+dialog .row{display:flex;gap:10px;margin-top:14px}
+dialog .row a,dialog .row button{flex:1;text-align:center;padding:10px;border-radius:12px;font:inherit;font-size:16px;text-decoration:none;cursor:pointer}
+dialog .go{background:linear-gradient(#c0392b,#8e1f16);color:#fff;border:1px solid #e57373}
+dialog .x{background:#2a1a0c;color:var(--ink);border:1px solid #6d5427}
+.warn{color:#ffcf8a}
+@media (max-width:620px){.hero{grid-template-columns:1fr}.qr{margin:0 auto}.shots.land img{height:150px}.shots.port img{height:300px}}
 </style></head>
-<body><main>
-<h1>澳門娛樂場</h1>
-<p class="sub">iPhone／iPad 網頁應用程式 · 可離線使用</p>
-<div class="apps">
-  <a class="app" href="casino/"><img src="casino-icon.png" alt=""><div><b>澳門娛樂場</b><span>21點 · 百家樂 · 德州撲克 · 加勒比海撲克 · 三張牌撲克 · 德州撲克紅利，可開房與朋友同枱；共用籌碼餘額（模擬遊戲，只供娛樂）</span></div></a>
-  <a class="app" href="road/"><img src="road-icon.png" alt=""><div><b>百家樂記路</b><span>珠盤路、大路、下三路、問路、統計及預測參考；可開房多機同步記路</span></div></a>
+<body class="is-desktop"><main>
+<h1>澳門娛樂場 · 百家樂記路</h1>
+<p class="sub">免費下載 · Android 應用程式／iPhone 網頁應用程式 · 版本 1.2.0</p>
+
+<div class="hero">
+  <div>
+    <div class="dev" id="devNote">請選擇你的裝置：Android 手機請下載 <b>APK</b>；iPhone／iPad 請以 Safari 開啟網頁版，再「<b>加入主畫面</b>」。在電腦上瀏覽時，可用手機掃描右方 QR 碼開啟本頁。</div>
+    <div class="jump">
+      <a href="#casino"><img src="casino-icon.png" alt="">澳門娛樂場</a>
+      <a href="#road"><img src="road-icon.png" alt="">百家樂記路</a>
+      <a href="#android-help">Android 安裝說明</a>
+      <a href="#ios-help">iPhone 安裝說明</a>
+    </div>
+  </div>
+  <div class="qr" id="qr"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 136 136"  preserveAspectRatio="xMinYMin meet" role="img" aria-label="本頁 QR 碼"><title>本頁 QR 碼</title><rect width="100%" height="100%" fill="white" cx="0" cy="0"/><path d="M2,2l4,0 0,4 -4,0 0,-4z M6,2l4,0 0,4 -4,0 0,-4z M10,2l4,0 0,4 -4,0 0,-4z M14,2l4,0 0,4 -4,0 0,-4z M18,2l4,0 0,4 -4,0 0,-4z M22,2l4,0 0,4 -4,0 0,-4z M26,2l4,0 0,4 -4,0 0,-4z M66,2l4,0 0,4 -4,0 0,-4z M78,2l4,0 0,4 -4,0 0,-4z M82,2l4,0 0,4 -4,0 0,-4z M86,2l4,0 0,4 -4,0 0,-4z M94,2l4,0 0,4 -4,0 0,-4z M106,2l4,0 0,4 -4,0 0,-4z M110,2l4,0 0,4 -4,0 0,-4z M114,2l4,0 0,4 -4,0 0,-4z M118,2l4,0 0,4 -4,0 0,-4z M122,2l4,0 0,4 -4,0 0,-4z M126,2l4,0 0,4 -4,0 0,-4z M130,2l4,0 0,4 -4,0 0,-4z M2,6l4,0 0,4 -4,0 0,-4z M26,6l4,0 0,4 -4,0 0,-4z M38,6l4,0 0,4 -4,0 0,-4z M46,6l4,0 0,4 -4,0 0,-4z M62,6l4,0 0,4 -4,0 0,-4z M66,6l4,0 0,4 -4,0 0,-4z M74,6l4,0 0,4 -4,0 0,-4z M82,6l4,0 0,4 -4,0 0,-4z M86,6l4,0 0,4 -4,0 0,-4z M98,6l4,0 0,4 -4,0 0,-4z M106,6l4,0 0,4 -4,0 0,-4z M130,6l4,0 0,4 -4,0 0,-4z M2,10l4,0 0,4 -4,0 0,-4z M10,10l4,0 0,4 -4,0 0,-4z M14,10l4,0 0,4 -4,0 0,-4z M18,10l4,0 0,4 -4,0 0,-4z M26,10l4,0 0,4 -4,0 0,-4z M34,10l4,0 0,4 -4,0 0,-4z M38,10l4,0 0,4 -4,0 0,-4z M46,10l4,0 0,4 -4,0 0,-4z M58,10l4,0 0,4 -4,0 0,-4z M66,10l4,0 0,4 -4,0 0,-4z M86,10l4,0 0,4 -4,0 0,-4z M94,10l4,0 0,4 -4,0 0,-4z M106,10l4,0 0,4 -4,0 0,-4z M114,10l4,0 0,4 -4,0 0,-4z M118,10l4,0 0,4 -4,0 0,-4z M122,10l4,0 0,4 -4,0 0,-4z M130,10l4,0 0,4 -4,0 0,-4z M2,14l4,0 0,4 -4,0 0,-4z M10,14l4,0 0,4 -4,0 0,-4z M14,14l4,0 0,4 -4,0 0,-4z M18,14l4,0 0,4 -4,0 0,-4z M26,14l4,0 0,4 -4,0 0,-4z M34,14l4,0 0,4 -4,0 0,-4z M42,14l4,0 0,4 -4,0 0,-4z M46,14l4,0 0,4 -4,0 0,-4z M50,14l4,0 0,4 -4,0 0,-4z M74,14l4,0 0,4 -4,0 0,-4z M78,14l4,0 0,4 -4,0 0,-4z M90,14l4,0 0,4 -4,0 0,-4z M94,14l4,0 0,4 -4,0 0,-4z M106,14l4,0 0,4 -4,0 0,-4z M114,14l4,0 0,4 -4,0 0,-4z M118,14l4,0 0,4 -4,0 0,-4z M122,14l4,0 0,4 -4,0 0,-4z M130,14l4,0 0,4 -4,0 0,-4z M2,18l4,0 0,4 -4,0 0,-4z M10,18l4,0 0,4 -4,0 0,-4z M14,18l4,0 0,4 -4,0 0,-4z M18,18l4,0 0,4 -4,0 0,-4z M26,18l4,0 0,4 -4,0 0,-4z M34,18l4,0 0,4 -4,0 0,-4z M42,18l4,0 0,4 -4,0 0,-4z M50,18l4,0 0,4 -4,0 0,-4z M54,18l4,0 0,4 -4,0 0,-4z M58,18l4,0 0,4 -4,0 0,-4z M62,18l4,0 0,4 -4,0 0,-4z M66,18l4,0 0,4 -4,0 0,-4z M82,18l4,0 0,4 -4,0 0,-4z M86,18l4,0 0,4 -4,0 0,-4z M90,18l4,0 0,4 -4,0 0,-4z M94,18l4,0 0,4 -4,0 0,-4z M106,18l4,0 0,4 -4,0 0,-4z M114,18l4,0 0,4 -4,0 0,-4z M118,18l4,0 0,4 -4,0 0,-4z M122,18l4,0 0,4 -4,0 0,-4z M130,18l4,0 0,4 -4,0 0,-4z M2,22l4,0 0,4 -4,0 0,-4z M26,22l4,0 0,4 -4,0 0,-4z M34,22l4,0 0,4 -4,0 0,-4z M38,22l4,0 0,4 -4,0 0,-4z M58,22l4,0 0,4 -4,0 0,-4z M78,22l4,0 0,4 -4,0 0,-4z M90,22l4,0 0,4 -4,0 0,-4z M98,22l4,0 0,4 -4,0 0,-4z M106,22l4,0 0,4 -4,0 0,-4z M130,22l4,0 0,4 -4,0 0,-4z M2,26l4,0 0,4 -4,0 0,-4z M6,26l4,0 0,4 -4,0 0,-4z M10,26l4,0 0,4 -4,0 0,-4z M14,26l4,0 0,4 -4,0 0,-4z M18,26l4,0 0,4 -4,0 0,-4z M22,26l4,0 0,4 -4,0 0,-4z M26,26l4,0 0,4 -4,0 0,-4z M34,26l4,0 0,4 -4,0 0,-4z M42,26l4,0 0,4 -4,0 0,-4z M50,26l4,0 0,4 -4,0 0,-4z M58,26l4,0 0,4 -4,0 0,-4z M66,26l4,0 0,4 -4,0 0,-4z M74,26l4,0 0,4 -4,0 0,-4z M82,26l4,0 0,4 -4,0 0,-4z M90,26l4,0 0,4 -4,0 0,-4z M98,26l4,0 0,4 -4,0 0,-4z M106,26l4,0 0,4 -4,0 0,-4z M110,26l4,0 0,4 -4,0 0,-4z M114,26l4,0 0,4 -4,0 0,-4z M118,26l4,0 0,4 -4,0 0,-4z M122,26l4,0 0,4 -4,0 0,-4z M126,26l4,0 0,4 -4,0 0,-4z M130,26l4,0 0,4 -4,0 0,-4z M34,30l4,0 0,4 -4,0 0,-4z M42,30l4,0 0,4 -4,0 0,-4z M46,30l4,0 0,4 -4,0 0,-4z M58,30l4,0 0,4 -4,0 0,-4z M66,30l4,0 0,4 -4,0 0,-4z M74,30l4,0 0,4 -4,0 0,-4z M78,30l4,0 0,4 -4,0 0,-4z M82,30l4,0 0,4 -4,0 0,-4z M86,30l4,0 0,4 -4,0 0,-4z M90,30l4,0 0,4 -4,0 0,-4z M98,30l4,0 0,4 -4,0 0,-4z M2,34l4,0 0,4 -4,0 0,-4z M10,34l4,0 0,4 -4,0 0,-4z M14,34l4,0 0,4 -4,0 0,-4z M18,34l4,0 0,4 -4,0 0,-4z M22,34l4,0 0,4 -4,0 0,-4z M26,34l4,0 0,4 -4,0 0,-4z M50,34l4,0 0,4 -4,0 0,-4z M54,34l4,0 0,4 -4,0 0,-4z M58,34l4,0 0,4 -4,0 0,-4z M70,34l4,0 0,4 -4,0 0,-4z M78,34l4,0 0,4 -4,0 0,-4z M90,34l4,0 0,4 -4,0 0,-4z M98,34l4,0 0,4 -4,0 0,-4z M106,34l4,0 0,4 -4,0 0,-4z M110,34l4,0 0,4 -4,0 0,-4z M114,34l4,0 0,4 -4,0 0,-4z M118,34l4,0 0,4 -4,0 0,-4z M122,34l4,0 0,4 -4,0 0,-4z M6,38l4,0 0,4 -4,0 0,-4z M10,38l4,0 0,4 -4,0 0,-4z M22,38l4,0 0,4 -4,0 0,-4z M30,38l4,0 0,4 -4,0 0,-4z M50,38l4,0 0,4 -4,0 0,-4z M54,38l4,0 0,4 -4,0 0,-4z M70,38l4,0 0,4 -4,0 0,-4z M74,38l4,0 0,4 -4,0 0,-4z M78,38l4,0 0,4 -4,0 0,-4z M82,38l4,0 0,4 -4,0 0,-4z M86,38l4,0 0,4 -4,0 0,-4z M94,38l4,0 0,4 -4,0 0,-4z M106,38l4,0 0,4 -4,0 0,-4z M110,38l4,0 0,4 -4,0 0,-4z M118,38l4,0 0,4 -4,0 0,-4z M122,38l4,0 0,4 -4,0 0,-4z M126,38l4,0 0,4 -4,0 0,-4z M130,38l4,0 0,4 -4,0 0,-4z M10,42l4,0 0,4 -4,0 0,-4z M14,42l4,0 0,4 -4,0 0,-4z M26,42l4,0 0,4 -4,0 0,-4z M38,42l4,0 0,4 -4,0 0,-4z M46,42l4,0 0,4 -4,0 0,-4z M50,42l4,0 0,4 -4,0 0,-4z M54,42l4,0 0,4 -4,0 0,-4z M58,42l4,0 0,4 -4,0 0,-4z M62,42l4,0 0,4 -4,0 0,-4z M66,42l4,0 0,4 -4,0 0,-4z M70,42l4,0 0,4 -4,0 0,-4z M82,42l4,0 0,4 -4,0 0,-4z M106,42l4,0 0,4 -4,0 0,-4z M114,42l4,0 0,4 -4,0 0,-4z M122,42l4,0 0,4 -4,0 0,-4z M126,42l4,0 0,4 -4,0 0,-4z M2,46l4,0 0,4 -4,0 0,-4z M6,46l4,0 0,4 -4,0 0,-4z M14,46l4,0 0,4 -4,0 0,-4z M18,46l4,0 0,4 -4,0 0,-4z M34,46l4,0 0,4 -4,0 0,-4z M46,46l4,0 0,4 -4,0 0,-4z M50,46l4,0 0,4 -4,0 0,-4z M54,46l4,0 0,4 -4,0 0,-4z M66,46l4,0 0,4 -4,0 0,-4z M70,46l4,0 0,4 -4,0 0,-4z M74,46l4,0 0,4 -4,0 0,-4z M78,46l4,0 0,4 -4,0 0,-4z M82,46l4,0 0,4 -4,0 0,-4z M86,46l4,0 0,4 -4,0 0,-4z M90,46l4,0 0,4 -4,0 0,-4z M102,46l4,0 0,4 -4,0 0,-4z M114,46l4,0 0,4 -4,0 0,-4z M118,46l4,0 0,4 -4,0 0,-4z M122,46l4,0 0,4 -4,0 0,-4z M126,46l4,0 0,4 -4,0 0,-4z M2,50l4,0 0,4 -4,0 0,-4z M18,50l4,0 0,4 -4,0 0,-4z M22,50l4,0 0,4 -4,0 0,-4z M26,50l4,0 0,4 -4,0 0,-4z M30,50l4,0 0,4 -4,0 0,-4z M38,50l4,0 0,4 -4,0 0,-4z M46,50l4,0 0,4 -4,0 0,-4z M50,50l4,0 0,4 -4,0 0,-4z M58,50l4,0 0,4 -4,0 0,-4z M66,50l4,0 0,4 -4,0 0,-4z M82,50l4,0 0,4 -4,0 0,-4z M102,50l4,0 0,4 -4,0 0,-4z M110,50l4,0 0,4 -4,0 0,-4z M114,50l4,0 0,4 -4,0 0,-4z M118,50l4,0 0,4 -4,0 0,-4z M6,54l4,0 0,4 -4,0 0,-4z M10,54l4,0 0,4 -4,0 0,-4z M14,54l4,0 0,4 -4,0 0,-4z M30,54l4,0 0,4 -4,0 0,-4z M38,54l4,0 0,4 -4,0 0,-4z M54,54l4,0 0,4 -4,0 0,-4z M62,54l4,0 0,4 -4,0 0,-4z M70,54l4,0 0,4 -4,0 0,-4z M74,54l4,0 0,4 -4,0 0,-4z M94,54l4,0 0,4 -4,0 0,-4z M106,54l4,0 0,4 -4,0 0,-4z M118,54l4,0 0,4 -4,0 0,-4z M122,54l4,0 0,4 -4,0 0,-4z M126,54l4,0 0,4 -4,0 0,-4z M130,54l4,0 0,4 -4,0 0,-4z M2,58l4,0 0,4 -4,0 0,-4z M6,58l4,0 0,4 -4,0 0,-4z M10,58l4,0 0,4 -4,0 0,-4z M14,58l4,0 0,4 -4,0 0,-4z M22,58l4,0 0,4 -4,0 0,-4z M26,58l4,0 0,4 -4,0 0,-4z M30,58l4,0 0,4 -4,0 0,-4z M34,58l4,0 0,4 -4,0 0,-4z M50,58l4,0 0,4 -4,0 0,-4z M62,58l4,0 0,4 -4,0 0,-4z M66,58l4,0 0,4 -4,0 0,-4z M74,58l4,0 0,4 -4,0 0,-4z M82,58l4,0 0,4 -4,0 0,-4z M86,58l4,0 0,4 -4,0 0,-4z M102,58l4,0 0,4 -4,0 0,-4z M106,58l4,0 0,4 -4,0 0,-4z M114,58l4,0 0,4 -4,0 0,-4z M118,58l4,0 0,4 -4,0 0,-4z M122,58l4,0 0,4 -4,0 0,-4z M126,58l4,0 0,4 -4,0 0,-4z M2,62l4,0 0,4 -4,0 0,-4z M18,62l4,0 0,4 -4,0 0,-4z M22,62l4,0 0,4 -4,0 0,-4z M30,62l4,0 0,4 -4,0 0,-4z M38,62l4,0 0,4 -4,0 0,-4z M42,62l4,0 0,4 -4,0 0,-4z M54,62l4,0 0,4 -4,0 0,-4z M58,62l4,0 0,4 -4,0 0,-4z M62,62l4,0 0,4 -4,0 0,-4z M74,62l4,0 0,4 -4,0 0,-4z M86,62l4,0 0,4 -4,0 0,-4z M98,62l4,0 0,4 -4,0 0,-4z M102,62l4,0 0,4 -4,0 0,-4z M106,62l4,0 0,4 -4,0 0,-4z M110,62l4,0 0,4 -4,0 0,-4z M122,62l4,0 0,4 -4,0 0,-4z M26,66l4,0 0,4 -4,0 0,-4z M30,66l4,0 0,4 -4,0 0,-4z M34,66l4,0 0,4 -4,0 0,-4z M38,66l4,0 0,4 -4,0 0,-4z M42,66l4,0 0,4 -4,0 0,-4z M50,66l4,0 0,4 -4,0 0,-4z M54,66l4,0 0,4 -4,0 0,-4z M58,66l4,0 0,4 -4,0 0,-4z M62,66l4,0 0,4 -4,0 0,-4z M70,66l4,0 0,4 -4,0 0,-4z M90,66l4,0 0,4 -4,0 0,-4z M98,66l4,0 0,4 -4,0 0,-4z M102,66l4,0 0,4 -4,0 0,-4z M110,66l4,0 0,4 -4,0 0,-4z M114,66l4,0 0,4 -4,0 0,-4z M130,66l4,0 0,4 -4,0 0,-4z M14,70l4,0 0,4 -4,0 0,-4z M18,70l4,0 0,4 -4,0 0,-4z M34,70l4,0 0,4 -4,0 0,-4z M38,70l4,0 0,4 -4,0 0,-4z M50,70l4,0 0,4 -4,0 0,-4z M58,70l4,0 0,4 -4,0 0,-4z M66,70l4,0 0,4 -4,0 0,-4z M78,70l4,0 0,4 -4,0 0,-4z M82,70l4,0 0,4 -4,0 0,-4z M94,70l4,0 0,4 -4,0 0,-4z M106,70l4,0 0,4 -4,0 0,-4z M110,70l4,0 0,4 -4,0 0,-4z M118,70l4,0 0,4 -4,0 0,-4z M122,70l4,0 0,4 -4,0 0,-4z M130,70l4,0 0,4 -4,0 0,-4z M6,74l4,0 0,4 -4,0 0,-4z M10,74l4,0 0,4 -4,0 0,-4z M18,74l4,0 0,4 -4,0 0,-4z M22,74l4,0 0,4 -4,0 0,-4z M26,74l4,0 0,4 -4,0 0,-4z M30,74l4,0 0,4 -4,0 0,-4z M34,74l4,0 0,4 -4,0 0,-4z M42,74l4,0 0,4 -4,0 0,-4z M46,74l4,0 0,4 -4,0 0,-4z M50,74l4,0 0,4 -4,0 0,-4z M54,74l4,0 0,4 -4,0 0,-4z M58,74l4,0 0,4 -4,0 0,-4z M62,74l4,0 0,4 -4,0 0,-4z M66,74l4,0 0,4 -4,0 0,-4z M74,74l4,0 0,4 -4,0 0,-4z M90,74l4,0 0,4 -4,0 0,-4z M102,74l4,0 0,4 -4,0 0,-4z M106,74l4,0 0,4 -4,0 0,-4z M110,74l4,0 0,4 -4,0 0,-4z M114,74l4,0 0,4 -4,0 0,-4z M122,74l4,0 0,4 -4,0 0,-4z M126,74l4,0 0,4 -4,0 0,-4z M2,78l4,0 0,4 -4,0 0,-4z M30,78l4,0 0,4 -4,0 0,-4z M34,78l4,0 0,4 -4,0 0,-4z M42,78l4,0 0,4 -4,0 0,-4z M46,78l4,0 0,4 -4,0 0,-4z M54,78l4,0 0,4 -4,0 0,-4z M62,78l4,0 0,4 -4,0 0,-4z M78,78l4,0 0,4 -4,0 0,-4z M82,78l4,0 0,4 -4,0 0,-4z M86,78l4,0 0,4 -4,0 0,-4z M90,78l4,0 0,4 -4,0 0,-4z M94,78l4,0 0,4 -4,0 0,-4z M106,78l4,0 0,4 -4,0 0,-4z M110,78l4,0 0,4 -4,0 0,-4z M114,78l4,0 0,4 -4,0 0,-4z M118,78l4,0 0,4 -4,0 0,-4z M122,78l4,0 0,4 -4,0 0,-4z M126,78l4,0 0,4 -4,0 0,-4z M130,78l4,0 0,4 -4,0 0,-4z M2,82l4,0 0,4 -4,0 0,-4z M6,82l4,0 0,4 -4,0 0,-4z M10,82l4,0 0,4 -4,0 0,-4z M14,82l4,0 0,4 -4,0 0,-4z M18,82l4,0 0,4 -4,0 0,-4z M22,82l4,0 0,4 -4,0 0,-4z M26,82l4,0 0,4 -4,0 0,-4z M30,82l4,0 0,4 -4,0 0,-4z M54,82l4,0 0,4 -4,0 0,-4z M74,82l4,0 0,4 -4,0 0,-4z M78,82l4,0 0,4 -4,0 0,-4z M86,82l4,0 0,4 -4,0 0,-4z M98,82l4,0 0,4 -4,0 0,-4z M102,82l4,0 0,4 -4,0 0,-4z M114,82l4,0 0,4 -4,0 0,-4z M118,82l4,0 0,4 -4,0 0,-4z M2,86l4,0 0,4 -4,0 0,-4z M14,86l4,0 0,4 -4,0 0,-4z M22,86l4,0 0,4 -4,0 0,-4z M34,86l4,0 0,4 -4,0 0,-4z M42,86l4,0 0,4 -4,0 0,-4z M58,86l4,0 0,4 -4,0 0,-4z M62,86l4,0 0,4 -4,0 0,-4z M66,86l4,0 0,4 -4,0 0,-4z M82,86l4,0 0,4 -4,0 0,-4z M94,86l4,0 0,4 -4,0 0,-4z M106,86l4,0 0,4 -4,0 0,-4z M118,86l4,0 0,4 -4,0 0,-4z M130,86l4,0 0,4 -4,0 0,-4z M2,90l4,0 0,4 -4,0 0,-4z M18,90l4,0 0,4 -4,0 0,-4z M26,90l4,0 0,4 -4,0 0,-4z M34,90l4,0 0,4 -4,0 0,-4z M38,90l4,0 0,4 -4,0 0,-4z M42,90l4,0 0,4 -4,0 0,-4z M46,90l4,0 0,4 -4,0 0,-4z M50,90l4,0 0,4 -4,0 0,-4z M78,90l4,0 0,4 -4,0 0,-4z M90,90l4,0 0,4 -4,0 0,-4z M106,90l4,0 0,4 -4,0 0,-4z M118,90l4,0 0,4 -4,0 0,-4z M122,90l4,0 0,4 -4,0 0,-4z M126,90l4,0 0,4 -4,0 0,-4z M2,94l4,0 0,4 -4,0 0,-4z M10,94l4,0 0,4 -4,0 0,-4z M30,94l4,0 0,4 -4,0 0,-4z M38,94l4,0 0,4 -4,0 0,-4z M46,94l4,0 0,4 -4,0 0,-4z M66,94l4,0 0,4 -4,0 0,-4z M78,94l4,0 0,4 -4,0 0,-4z M82,94l4,0 0,4 -4,0 0,-4z M86,94l4,0 0,4 -4,0 0,-4z M90,94l4,0 0,4 -4,0 0,-4z M110,94l4,0 0,4 -4,0 0,-4z M118,94l4,0 0,4 -4,0 0,-4z M122,94l4,0 0,4 -4,0 0,-4z M126,94l4,0 0,4 -4,0 0,-4z M130,94l4,0 0,4 -4,0 0,-4z M2,98l4,0 0,4 -4,0 0,-4z M10,98l4,0 0,4 -4,0 0,-4z M14,98l4,0 0,4 -4,0 0,-4z M22,98l4,0 0,4 -4,0 0,-4z M26,98l4,0 0,4 -4,0 0,-4z M30,98l4,0 0,4 -4,0 0,-4z M42,98l4,0 0,4 -4,0 0,-4z M50,98l4,0 0,4 -4,0 0,-4z M54,98l4,0 0,4 -4,0 0,-4z M58,98l4,0 0,4 -4,0 0,-4z M70,98l4,0 0,4 -4,0 0,-4z M78,98l4,0 0,4 -4,0 0,-4z M90,98l4,0 0,4 -4,0 0,-4z M94,98l4,0 0,4 -4,0 0,-4z M98,98l4,0 0,4 -4,0 0,-4z M102,98l4,0 0,4 -4,0 0,-4z M106,98l4,0 0,4 -4,0 0,-4z M110,98l4,0 0,4 -4,0 0,-4z M114,98l4,0 0,4 -4,0 0,-4z M126,98l4,0 0,4 -4,0 0,-4z M130,98l4,0 0,4 -4,0 0,-4z M34,102l4,0 0,4 -4,0 0,-4z M42,102l4,0 0,4 -4,0 0,-4z M54,102l4,0 0,4 -4,0 0,-4z M58,102l4,0 0,4 -4,0 0,-4z M66,102l4,0 0,4 -4,0 0,-4z M70,102l4,0 0,4 -4,0 0,-4z M74,102l4,0 0,4 -4,0 0,-4z M78,102l4,0 0,4 -4,0 0,-4z M94,102l4,0 0,4 -4,0 0,-4z M98,102l4,0 0,4 -4,0 0,-4z M114,102l4,0 0,4 -4,0 0,-4z M122,102l4,0 0,4 -4,0 0,-4z M130,102l4,0 0,4 -4,0 0,-4z M2,106l4,0 0,4 -4,0 0,-4z M6,106l4,0 0,4 -4,0 0,-4z M10,106l4,0 0,4 -4,0 0,-4z M14,106l4,0 0,4 -4,0 0,-4z M18,106l4,0 0,4 -4,0 0,-4z M22,106l4,0 0,4 -4,0 0,-4z M26,106l4,0 0,4 -4,0 0,-4z M46,106l4,0 0,4 -4,0 0,-4z M50,106l4,0 0,4 -4,0 0,-4z M54,106l4,0 0,4 -4,0 0,-4z M58,106l4,0 0,4 -4,0 0,-4z M62,106l4,0 0,4 -4,0 0,-4z M70,106l4,0 0,4 -4,0 0,-4z M82,106l4,0 0,4 -4,0 0,-4z M90,106l4,0 0,4 -4,0 0,-4z M94,106l4,0 0,4 -4,0 0,-4z M98,106l4,0 0,4 -4,0 0,-4z M106,106l4,0 0,4 -4,0 0,-4z M114,106l4,0 0,4 -4,0 0,-4z M122,106l4,0 0,4 -4,0 0,-4z M126,106l4,0 0,4 -4,0 0,-4z M2,110l4,0 0,4 -4,0 0,-4z M26,110l4,0 0,4 -4,0 0,-4z M34,110l4,0 0,4 -4,0 0,-4z M38,110l4,0 0,4 -4,0 0,-4z M42,110l4,0 0,4 -4,0 0,-4z M46,110l4,0 0,4 -4,0 0,-4z M54,110l4,0 0,4 -4,0 0,-4z M66,110l4,0 0,4 -4,0 0,-4z M70,110l4,0 0,4 -4,0 0,-4z M74,110l4,0 0,4 -4,0 0,-4z M78,110l4,0 0,4 -4,0 0,-4z M82,110l4,0 0,4 -4,0 0,-4z M94,110l4,0 0,4 -4,0 0,-4z M98,110l4,0 0,4 -4,0 0,-4z M114,110l4,0 0,4 -4,0 0,-4z M118,110l4,0 0,4 -4,0 0,-4z M122,110l4,0 0,4 -4,0 0,-4z M126,110l4,0 0,4 -4,0 0,-4z M2,114l4,0 0,4 -4,0 0,-4z M10,114l4,0 0,4 -4,0 0,-4z M14,114l4,0 0,4 -4,0 0,-4z M18,114l4,0 0,4 -4,0 0,-4z M26,114l4,0 0,4 -4,0 0,-4z M34,114l4,0 0,4 -4,0 0,-4z M46,114l4,0 0,4 -4,0 0,-4z M50,114l4,0 0,4 -4,0 0,-4z M54,114l4,0 0,4 -4,0 0,-4z M58,114l4,0 0,4 -4,0 0,-4z M66,114l4,0 0,4 -4,0 0,-4z M82,114l4,0 0,4 -4,0 0,-4z M86,114l4,0 0,4 -4,0 0,-4z M90,114l4,0 0,4 -4,0 0,-4z M98,114l4,0 0,4 -4,0 0,-4z M102,114l4,0 0,4 -4,0 0,-4z M106,114l4,0 0,4 -4,0 0,-4z M110,114l4,0 0,4 -4,0 0,-4z M114,114l4,0 0,4 -4,0 0,-4z M118,114l4,0 0,4 -4,0 0,-4z M2,118l4,0 0,4 -4,0 0,-4z M10,118l4,0 0,4 -4,0 0,-4z M14,118l4,0 0,4 -4,0 0,-4z M18,118l4,0 0,4 -4,0 0,-4z M26,118l4,0 0,4 -4,0 0,-4z M34,118l4,0 0,4 -4,0 0,-4z M38,118l4,0 0,4 -4,0 0,-4z M42,118l4,0 0,4 -4,0 0,-4z M46,118l4,0 0,4 -4,0 0,-4z M54,118l4,0 0,4 -4,0 0,-4z M62,118l4,0 0,4 -4,0 0,-4z M74,118l4,0 0,4 -4,0 0,-4z M94,118l4,0 0,4 -4,0 0,-4z M102,118l4,0 0,4 -4,0 0,-4z M114,118l4,0 0,4 -4,0 0,-4z M122,118l4,0 0,4 -4,0 0,-4z M130,118l4,0 0,4 -4,0 0,-4z M2,122l4,0 0,4 -4,0 0,-4z M10,122l4,0 0,4 -4,0 0,-4z M14,122l4,0 0,4 -4,0 0,-4z M18,122l4,0 0,4 -4,0 0,-4z M26,122l4,0 0,4 -4,0 0,-4z M34,122l4,0 0,4 -4,0 0,-4z M42,122l4,0 0,4 -4,0 0,-4z M50,122l4,0 0,4 -4,0 0,-4z M62,122l4,0 0,4 -4,0 0,-4z M66,122l4,0 0,4 -4,0 0,-4z M70,122l4,0 0,4 -4,0 0,-4z M74,122l4,0 0,4 -4,0 0,-4z M82,122l4,0 0,4 -4,0 0,-4z M90,122l4,0 0,4 -4,0 0,-4z M94,122l4,0 0,4 -4,0 0,-4z M106,122l4,0 0,4 -4,0 0,-4z M110,122l4,0 0,4 -4,0 0,-4z M118,122l4,0 0,4 -4,0 0,-4z M2,126l4,0 0,4 -4,0 0,-4z M26,126l4,0 0,4 -4,0 0,-4z M38,126l4,0 0,4 -4,0 0,-4z M42,126l4,0 0,4 -4,0 0,-4z M46,126l4,0 0,4 -4,0 0,-4z M50,126l4,0 0,4 -4,0 0,-4z M58,126l4,0 0,4 -4,0 0,-4z M62,126l4,0 0,4 -4,0 0,-4z M74,126l4,0 0,4 -4,0 0,-4z M86,126l4,0 0,4 -4,0 0,-4z M102,126l4,0 0,4 -4,0 0,-4z M106,126l4,0 0,4 -4,0 0,-4z M114,126l4,0 0,4 -4,0 0,-4z M118,126l4,0 0,4 -4,0 0,-4z M122,126l4,0 0,4 -4,0 0,-4z M2,130l4,0 0,4 -4,0 0,-4z M6,130l4,0 0,4 -4,0 0,-4z M10,130l4,0 0,4 -4,0 0,-4z M14,130l4,0 0,4 -4,0 0,-4z M18,130l4,0 0,4 -4,0 0,-4z M22,130l4,0 0,4 -4,0 0,-4z M26,130l4,0 0,4 -4,0 0,-4z M34,130l4,0 0,4 -4,0 0,-4z M62,130l4,0 0,4 -4,0 0,-4z M70,130l4,0 0,4 -4,0 0,-4z M74,130l4,0 0,4 -4,0 0,-4z M90,130l4,0 0,4 -4,0 0,-4z M98,130l4,0 0,4 -4,0 0,-4z M102,130l4,0 0,4 -4,0 0,-4z M106,130l4,0 0,4 -4,0 0,-4z M110,130l4,0 0,4 -4,0 0,-4z M126,130l4,0 0,4 -4,0 0,-4z " stroke="transparent" fill="black"/></svg>以手機相機掃描，<br>即可在手機開啟本頁</div>
 </div>
-<section>
-  <h2>在 iPhone／iPad 安裝</h2>
+
+<section class="app" id="casino">
+  <div class="app-h"><img src="casino-icon.png" alt=""><div><h2>澳門娛樂場<span class="ver">v1.2.0</span></h2>
+    <p>21點 · 百家樂 · 德州撲克 · 加勒比海撲克 · 三張牌撲克 · 德州撲克紅利 · 朋友同枱</p></div></div>
+  <ul class="feat">
+    <li>21點（歐式無暗牌、黑傑克 3 賠 2、對子旁注）及百家樂（佣金／免佣、路紙、瞇牌）。</li>
+    <li>德州撲克可與電腦對戰或與朋友同枱；另有加勒比海撲克、三張牌撲克及德州撲克紅利。</li>
+    <li>朋友同枱：由房主開房並發出房間籌碼，可逐一批准、修改或拒絕加入申請，亦可隨時補碼或調整；離開房間時只把淨輸贏計入本機餘額。</li>
+    <li>單機遊戲毋須上網；只供娛樂，不涉及真實金錢。</li>
+  </ul>
+  <div class="shots land">
+    <a href="img/casino-1-lobby.jpg" target="_blank"><img src="img/casino-1-lobby.jpg" alt="大堂" loading="lazy" width="1200" height="675"></a>
+    <a href="img/casino-2-baccarat.jpg" target="_blank"><img src="img/casino-2-baccarat.jpg" alt="百家樂" loading="lazy" width="1200" height="555"></a>
+    <a href="img/casino-3-blackjack.jpg" target="_blank"><img src="img/casino-3-blackjack.jpg" alt="21點" loading="lazy" width="1200" height="555"></a>
+    <a href="img/casino-4-holdem.jpg" target="_blank"><img src="img/casino-4-holdem.jpg" alt="德州撲克" loading="lazy" width="1200" height="750"></a>
+    <a href="img/casino-5-room.jpg" target="_blank"><img src="img/casino-5-room.jpg" alt="朋友同枱開房設定" loading="lazy" width="1200" height="675"></a>
+  </div>
+  <div class="dl">
+    <a class="btn android" id="dlCasino" href="https://github.com/HOWENGHONG/macau-casino-apps/releases/download/v1.2.0/macau-casino-1.2.0.apk" download><span class="rec">建議</span><span class="ic">🤖</span><span><b>下載 Android APK</b><small>版本 1.2.0 · 141 KB · Android 8.0 或以上</small></span></a>
+    <a class="btn ios" href="casino/" data-app="澳門娛樂場" data-note="本程式以橫向畫面運行，建議打橫手機使用。"><span class="rec">建議</span><span class="ic">📱</span><span><b>iPhone／iPad：開啟網頁版</b><small>以 Safari 開啟，再「加入主畫面」</small></span></a>
+  </div>
+  <details class="file"><summary>檔案資料及 SHA-256 校驗碼</summary><table>
+    <tr><td>檔案名稱</td><td><code>macau-casino-1.2.0.apk</code></td></tr>
+    <tr><td>版本</td><td>1.2.0（版本代碼 3）</td></tr>
+    <tr><td>檔案大小</td><td>141 KB（144,134 位元組）</td></tr>
+    <tr><td>套件名稱</td><td><code>com.cristian.macaucasino</code></td></tr>
+    <tr><td>SHA-256</td><td><code>bff5a5e1719e50f4229449cdd29d3d375ace24198a6ad1c15fbb2bba973e1c66</code></td></tr>
+  </table></details>
+</section>
+
+<section class="app" id="road">
+  <div class="app-h"><img src="road-icon.png" alt=""><div><h2>百家樂記路<span class="ver">v1.2.0</span></h2>
+    <p>珠盤路 · 大路 · 大眼仔 · 小路 · 曱甴路 · 問路 · 統計 · 預測參考 · 多機同步</p></div></div>
+  <ul class="feat">
+    <li>一按即記錄莊、閒、和及對子，自動繪畫五種路紙，並提供莊問路／閒問路。</li>
+    <li>統計局數、勝率、最長連勝；多方面預測只屬路紙參考，無法抵銷莊家優勢。</li>
+    <li>可保存及翻查歷史靴數；可開房讓多部裝置同步記路（以房號或 QR 碼加入）。</li>
+    <li>記錄毋須上網；多機同步需要連接互聯網。</li>
+  </ul>
+  <div class="shots port">
+    <a href="img/road-1-main.jpg" target="_blank"><img src="img/road-1-main.jpg" alt="記路主畫面" loading="lazy" width="540" height="1169"></a>
+    <a href="img/road-2-predict.jpg" target="_blank"><img src="img/road-2-predict.jpg" alt="預測參考" loading="lazy" width="540" height="1169"></a>
+    <a href="img/road-3-history.jpg" target="_blank"><img src="img/road-3-history.jpg" alt="歷史紀錄" loading="lazy" width="540" height="1169"></a>
+    <a href="img/road-4-room.jpg" target="_blank"><img src="img/road-4-room.jpg" alt="多機同步記路" loading="lazy" width="540" height="1169"></a>
+  </div>
+  <div class="dl">
+    <a class="btn android" id="dlRoad" href="https://github.com/HOWENGHONG/macau-casino-apps/releases/download/v1.2.0/baccarat-road-1.2.0.apk" download><span class="rec">建議</span><span class="ic">🤖</span><span><b>下載 Android APK</b><small>版本 1.2.0 · 77 KB · Android 8.0 或以上</small></span></a>
+    <a class="btn ios" href="road/" data-app="百家樂記路" data-note=""><span class="rec">建議</span><span class="ic">📱</span><span><b>iPhone／iPad：開啟網頁版</b><small>以 Safari 開啟，再「加入主畫面」</small></span></a>
+  </div>
+  <details class="file"><summary>檔案資料及 SHA-256 校驗碼</summary><table>
+    <tr><td>檔案名稱</td><td><code>baccarat-road-1.2.0.apk</code></td></tr>
+    <tr><td>版本</td><td>1.2.0（版本代碼 3）</td></tr>
+    <tr><td>檔案大小</td><td>77 KB（78,530 位元組）</td></tr>
+    <tr><td>套件名稱</td><td><code>com.cristian.baccaratroad</code></td></tr>
+    <tr><td>SHA-256</td><td><code>aa4116033c8725be8e1892a0aef3d6c1bfd825ecdfd41d37fcd1441ea6d06f49</code></td></tr>
+  </table></details>
+</section>
+
+<section class="help" id="android-help">
+  <h2>在 Android 手機安裝</h2>
+  <ol>
+    <li>按上方「<b>下載 Android APK</b>」，下載完成後，在通知列或「檔案」／「下載」中按該 APK 檔案。</li>
+    <li>如出現「基於安全理由，你的手機不允許安裝來自此來源的不明應用程式」，請按「<b>設定</b>」，開啟「<b>允許此來源的應用程式</b>」，然後返回再按「安裝」。<br>
+      <span class="note">亦可預先前往：設定 → 應用程式 → 特別應用程式存取權 → 安裝不明應用程式 → 選擇你用作下載的瀏覽器（例如 Chrome）或「檔案」→ 允許。各品牌手機的選單名稱或略有不同。</span></li>
+    <li>如 Google Play 保護機制顯示「未知的應用程式」或建議掃描，可選擇「<b>仍要安裝</b>」（或先掃描後再安裝）。本程式不在 Google Play 上架，因此會出現此提示。</li>
+    <li>安裝完成後，按「開啟」或在主畫面／應用程式清單中找到圖示。為安全起見，安裝後可再次關閉「安裝不明應用程式」的權限。</li>
+  </ol>
+  <p class="note">更新版本：直接下載新版 APK 覆蓋安裝即可，已儲存的餘額及紀錄會保留（兩個版本使用同一簽署證書）。請勿先解除安裝舊版，否則資料會被刪除。<br>
+  校驗檔案：可在「檔案資料」核對 SHA-256，或下載 <a href="https://github.com/HOWENGHONG/macau-casino-apps/releases/download/v1.2.0/SHA256SUMS.txt">SHA256SUMS.txt</a>。簽署證書 SHA-256：<code>d35d31fe956c400d9b1b39987cf854fb48e41d326dfdcebb06ff3e6a67fd384a</code></p>
+</section>
+
+<section class="help" id="ios-help">
+  <h2>在 iPhone／iPad 安裝（加入主畫面）</h2>
   <ol>
     <li>必須使用 <b>Safari</b> 開啟本頁（其他瀏覽器未必提供此功能）。</li>
-    <li>按上方其中一個程式進入。</li>
+    <li>按上方「<b>iPhone／iPad：開啟網頁版</b>」進入程式。</li>
     <li>按畫面底部（iPad 為頂部）的「分享」按鈕 <kbd>⬆︎</kbd>。</li>
     <li>向下捲動，選擇「<b>加入主畫面</b>」，再按「新增」。</li>
     <li>之後從主畫面圖示開啟，即以全螢幕運行；首次開啟後，即使沒有網絡亦可使用。</li>
   </ol>
   <p class="note">兩個程式需分別加入主畫面。建議安裝後最少開啟一次並等候數秒，讓程式完成離線下載。</p>
 </section>
-<section>
+
+<section class="help">
   <h2>注意事項</h2>
   <ul>
-    <li>紀錄及餘額只儲存在該部裝置上；每個主畫面程式各自獨立儲存，與 Android 版本及 Safari 瀏覽器分開，不會互通。</li>
+    <li>餘額及紀錄只儲存在該部裝置上；Android 版本、各個主畫面程式及 Safari 瀏覽器各自獨立儲存，不會互通。</li>
+    <li>朋友同枱時，房內籌碼由房主發出及管理；離開房間時，只把本房淨輸贏計入你的本機餘額。</li>
     <li>如刪除主畫面圖示，或在 Safari 中僅以網頁形式使用而長時間未開啟，iOS 可能清除已儲存的資料。</li>
-    <li>21點及百家樂音效：請先輕按畫面一次以啟動聲音；iPhone 設為靜音模式時可能沒有聲音。</li>
-    <li>百家樂記路的震動回饋在 iOS 上不支援，其餘功能不受影響。</li>
-    <li>朋友同枱／多機同步需要連接互聯網；單機遊戲可離線使用。部分公司或流動網絡可能阻擋點對點連線。</li>
+    <li>音效：請先輕按畫面一次以啟動聲音；iPhone 設為靜音模式時可能沒有聲音。百家樂記路的震動回饋在 iOS 上不支援。</li>
+    <li>朋友同枱／多機同步需要連接互聯網；部分公司或流動網絡可能阻擋點對點連線。</li>
     <li>以上遊戲為單機模擬，不涉及真實金錢；預測功能只屬路紙參考，無法抵銷莊家優勢。</li>
   </ul>
 </section>
-</main></body></html>
+
+<footer>版本 1.2.0 · 2026年9月30日 · <a href="https://github.com/HOWENGHONG/macau-casino-apps/releases/tag/v1.2.0">發佈頁面及所有檔案</a> · <a href="https://github.com/HOWENGHONG/macau-casino-apps">GitHub</a></footer>
+</main>
+
+<dialog id="iosDlg">
+  <h3 id="iosT">加入主畫面</h3>
+  <p class="warn" id="iosSaf" hidden>你目前並非使用 Safari：請先複製本頁網址，再以 Safari 開啟，方可加入主畫面。</p>
+  <ol>
+    <li>按「開啟」進入程式。</li>
+    <li>按 Safari 的「分享」按鈕 <kbd>⬆︎</kbd>（iPhone 在畫面底部，iPad 在頂部）。</li>
+    <li>選擇「<b>加入主畫面</b>」，再按「新增」。</li>
+    <li>之後從主畫面圖示開啟即可全螢幕使用，亦可離線使用。</li>
+  </ol>
+  <p class="note" id="iosNote"></p>
+  <div class="row"><button class="x" id="iosX" type="button">取消</button><a class="go" id="iosGo" href="casino/">開啟</a></div>
+</dialog>
+
+<script>
+(function () {
+  var ua = navigator.userAgent || '', b = document.body;
+  var ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var android = !ios && /Android/i.test(ua);
+  b.className = ios ? 'is-ios' : android ? 'is-android' : 'is-desktop';
+  var note = document.getElementById('devNote');
+  if (ios) note.innerHTML = '已偵測到 <b>iPhone／iPad</b>：請按各程式的「<b>iPhone／iPad：開啟網頁版</b>」，再以 Safari「加入主畫面」。（iOS 無法安裝 APK 檔案。）';
+  else if (android) note.innerHTML = '已偵測到 <b>Android</b> 裝置：請按「<b>下載 Android APK</b>」，下載後按檔案安裝；首次安裝須允許安裝不明應用程式（見下方說明）。';
+  var dlg = document.getElementById('iosDlg'), safari = ios && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua);
+  [].forEach.call(document.querySelectorAll('a.btn.ios'), function (a) {
+    a.addEventListener('click', function (e) {
+      if (!dlg.showModal) return;
+      e.preventDefault();
+      document.getElementById('iosT').textContent = '安裝「' + a.dataset.app + '」到主畫面';
+      document.getElementById('iosGo').setAttribute('href', a.getAttribute('href'));
+      document.getElementById('iosNote').textContent = a.dataset.note || '';
+      document.getElementById('iosSaf').hidden = !ios || safari;
+      dlg.showModal();
+    });
+  });
+  document.getElementById('iosX').onclick = function () { dlg.close(); };
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+})();
+</script>
+</body></html>

@@ -815,7 +815,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     return true;
   }
-  var HELLO = { t: 'enum:hello', v: 'int:1:1', app: 'enum:casino|road', pid: 'hex:16', tok: 'hex:32', name: 'str:40', bal: '?int:0:1000000000' };
+  var HELLO = { t: 'enum:hello', v: 'int:1:1', app: 'enum:casino|road', pid: 'hex:16', tok: 'hex:32', name: 'str:40', bal: '?int:0:1000000000', req: '?int:0:10000000' };  // bal: legacy, ignored (never trusted)
   // client -> host message specs per app
   var SPECS = {
     road: {
@@ -849,21 +849,45 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return m;
   }
   // ---- players (host side) ----
-  /** Ledger of remote players: identity (pid+secret token), nickname, host-tracked balance, connection state. */
-  function Ledger(max) { this.max = max || MAX_PLAYERS - 1; this.p = {}; this.order = []; }
+  /** Host-issued room ledger of remote players: identity (pid+secret token), nickname, room chips, connection state.
+      The client's own bankroll is never trusted: chips are issued by the host (fixed amount, or approve/edit each request)
+      and only the net result (bal - issued) is settled back to the player's local bankroll when they leave.
+      opts: {start: chips issued to each player (0 = none), approve: true = host must approve each join} */
+  var CHIP_MIN = 100, CHIP_MAX = 10000000;
+  function chipAmt(x) { return typeof x === 'number' && isFinite(x) && x === Math.floor(x) && x % 100 === 0 && x >= CHIP_MIN && x <= CHIP_MAX; }
+  function Ledger(max, opts) { if (typeof max === 'object' && max) { opts = max; max = opts.max; } this.max = max || MAX_PLAYERS - 1; this.opts = opts || {}; this.p = {}; this.order = []; }
   Ledger.prototype.join = function (h) {
     var ex = this.p[h.pid];
     if (ex) { if (ex.tok !== h.tok) return { err: 'bad-token' }; ex.conn = true; ex.name = cleanName(h.name); return { player: ex, rejoin: true }; }
     if (this.order.length >= this.max) return { err: 'full' };
-    var bal = typeof h.bal === 'number' ? Math.max(0, Math.min(1e9, Math.floor(h.bal))) : 0;
-    var pl = { pid: h.pid, tok: h.tok, name: cleanName(h.name), bal: bal, conn: true, ready: false, last: null };
+    var o = this.opts, start = chipAmt(o.start) ? o.start : 0, req = chipAmt(h.req) ? h.req : start;
+    var pl = { pid: h.pid, tok: h.tok, name: cleanName(h.name), bal: 0, issued: 0, req: req, status: o.approve ? 'pending' : 'ok', conn: true, ready: false, last: null };
+    if (!o.approve) { pl.bal = pl.issued = start; }
     this.p[h.pid] = pl; this.order.push(h.pid); return { player: pl, rejoin: false };
   };
+  /** Host approves a pending player with amt chips (may differ from the request). Returns '' or an error. */
+  Ledger.prototype.approve = function (pid, amt) {
+    var p = this.p[pid]; if (!p) return '玩家不存在'; if (p.status !== 'pending') return '已批准';
+    if (!chipAmt(amt)) return '金額須為 HK$100 – 10,000,000，並以 100 為單位';
+    p.bal = p.issued = amt; p.status = 'ok'; return '';
+  };
+  Ledger.prototype.reject = function (pid) { var p = this.p[pid]; if (!p || p.status !== 'pending') return false; return this.remove(pid); };
+  /** Host top-up (+) or reduction (-) of a player's room chips; issued moves with it so the net result is unchanged. */
+  Ledger.prototype.adjust = function (pid, delta) {
+    var p = this.p[pid]; if (!p || p.status !== 'ok') return '玩家不存在';
+    if (typeof delta !== 'number' || !isFinite(delta) || delta !== Math.floor(delta) || delta % 100 !== 0 || delta === 0) return '金額須以 100 為單位';
+    if (p.bal + delta < 0) return '籌碼不可少於零';
+    if (p.issued + delta > CHIP_MAX * 10) return '超出上限';
+    p.bal += delta; p.issued += delta; return '';
+  };
+  Ledger.prototype.net = function (pid) { var p = this.p[pid]; return p ? p.bal - p.issued : 0; };
+  Ledger.prototype.active = function () { return this.list().filter(function (p) { return p.status === 'ok'; }); };
+  Ledger.prototype.pending = function () { return this.list().filter(function (p) { return p.status === 'pending'; }); };
   Ledger.prototype.get = function (pid) { return this.p[pid] || null; };
   Ledger.prototype.list = function () { var s = this; return s.order.map(function (id) { return s.p[id]; }); };
   Ledger.prototype.remove = function (pid) { if (!this.p[pid]) return false; delete this.p[pid]; this.order = this.order.filter(function (x) { return x !== pid; }); return true; };
-  Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
-  Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || !(x >= 0)) return false; p.bal += x; return true; };
+  Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
+  Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0)) return false; p.bal += x; return true; };
 
   // ---- 21點 seat rules (host validates every client bet) ----
   var BJ = { maxSeats: 3, numSeats: 7, minBet: 100, maxBet: 20000, sideMax: 1000 };
@@ -916,7 +940,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   var CHAT = ['👍', '👏', '🔥', '😂', '😱', '🙏', '💰', '🤞', '好牌！', '加油！', '再嚟！', '唔好意思', '多謝晒', '等等我', '跟你！', '食糊！'];
   var api = { ALPHA: ALPHA, CODE_LEN: CODE_LEN, MAX_PLAYERS: MAX_PLAYERS, MAX_MSG: MAX_MSG, DENOMS: DENOMS, CHAT: CHAT, BJ: BJ, BAC_KEYS: BAC_KEYS,
-    makeCode: makeCode, normCode: normCode, makeId: makeId, cleanName: cleanName, check: check, parseClient: parseClient, Ledger: Ledger,
+    makeCode: makeCode, normCode: normCode, makeId: makeId, cleanName: cleanName, check: check, parseClient: parseClient, Ledger: Ledger, chipAmt: chipAmt,
     bjBetError: bjBetError, bjCanAct: bjCanAct, squeezers: squeezers, roadApply: roadApply, cleanRoadState: cleanRoadState };
   root.MPCore = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -1062,7 +1086,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         self._last = Date.now();
         if (m.t === 'ping') { try { c.send('{"t":"pong"}'); } catch (e) {} return; }
         if (m.t === 'reject') { var f = self._first; self._first = null; self.close(true); if (f) f.reject({ type: m.reason }); else self.emit('closed', m.reason); return; }
-        if (m.t === 'bye') { self.close(true); self.emit('closed', m.reason || 'host-left'); return; }
+        if (m.t === 'bye') { var fb = self._first; self._first = null; self.close(true); if (fb) fb.reject({ type: m.reason || 'host-left' }); else self.emit('closed', m.reason || 'host-left'); return; }
         if (m.t === 'welcome') { self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
         self.emit('msg', m);
       });
@@ -1133,7 +1157,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     timeout: '連線逾時，請檢查網絡後再試', 'host-left': '房主已離開房間', 'host-lost': '與房主失去連線', kicked: '你已被移出房間',
     network: '無法連接配對伺服器，請檢查網絡', 'server-error': '配對伺服器暫時無法使用，請稍後再試', 'socket-error': '無法連接配對伺服器，請檢查網絡',
     'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號衝突，請再試一次',
-    'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', started: '牌局進行中，請稍候再加入'
+    'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', rejected: '房主拒絕了你的加入申請', started: '牌局進行中，請稍候再加入'
   };
   function errText(e) { var k = e && (e.type || e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }

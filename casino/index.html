@@ -480,6 +480,18 @@ body{background:
 /* lobby scrolls when the 撲克 / 朋友同枱 sections do not fit: safe centring (never cut off the top) */
 #lobby{justify-content:flex-start!important}
 #lobby>:first-child{margin-top:auto}#lobby>:last-child{margin-bottom:auto}
+/* host-issued room chips: approvals / adjustments */
+#mpPlBtn.alert{border-color:#ffe066;background:#8c5e05;color:#fff;animation:mpblink .7s infinite alternate}
+.mp-pend{border:1px solid #ffe066;border-radius:10px;padding:6px;margin:0 0 8px;background:rgba(80,60,0,.35)}
+.mp-pend h5{margin:0 0 6px;color:#ffe066;font-size:13px}
+.mp-preq{padding:4px 0;border-top:1px solid rgba(255,224,102,.25)}.mp-preq:first-of-type{border-top:0}
+.mp-preq small{display:block;color:#e8d6a8;font-size:11px}.mp-prow{display:flex;gap:4px;margin-top:4px}
+.mp-prow input,#adjV{flex:1;min-width:0;width:100%;box-sizing:border-box;background:#120604;border:1px solid #a07b3a;color:#fff;border-radius:8px;padding:6px 8px;font:700 14px var(--font)}
+.mp-prow .tbtn{padding:4px 8px;min-height:32px}
+#mpSide li em{font-style:normal;font-size:11px;margin-left:4px;color:#ddd}#mpSide li em.pos{color:#8dffae}#mpSide li em.neg{color:#ff9c9c}
+#mpSide .mp-adj{padding:2px 6px;min-height:24px;font-size:11px;margin-left:6px}
+.mp-settle{color:#ffe9a8;font-weight:700}
+#lbReq{background:#120604;border:1px solid #a07b3a;color:#fff;border-radius:8px;padding:6px 8px;font:700 14px var(--font)}
 
 /* 賭枱撲克 */
 .tp-table{flex-direction:row}
@@ -556,7 +568,7 @@ input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webk
       <div class="go">入座</div>
     </div>
   </div>
-  <div class="lb-foot">模擬遊戲，只供娛樂，不涉及真實金錢。所有遊戲（包括朋友同枱）共用同一籌碼餘額，並自動儲存於本機瀏覽器。</div>
+  <div class="lb-foot">模擬遊戲，只供娛樂，不涉及真實金錢。籌碼餘額自動儲存於本機；朋友同枱時改用房主發出的房間籌碼，離開房間時只把淨輸贏計入本機餘額。</div>
 </div>
 
 <div id="bjApp" class="app hidden">
@@ -2080,7 +2092,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     return true;
   }
-  var HELLO = { t: 'enum:hello', v: 'int:1:1', app: 'enum:casino|road', pid: 'hex:16', tok: 'hex:32', name: 'str:40', bal: '?int:0:1000000000' };
+  var HELLO = { t: 'enum:hello', v: 'int:1:1', app: 'enum:casino|road', pid: 'hex:16', tok: 'hex:32', name: 'str:40', bal: '?int:0:1000000000', req: '?int:0:10000000' };  // bal: legacy, ignored (never trusted)
   // client -> host message specs per app
   var SPECS = {
     road: {
@@ -2114,21 +2126,45 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return m;
   }
   // ---- players (host side) ----
-  /** Ledger of remote players: identity (pid+secret token), nickname, host-tracked balance, connection state. */
-  function Ledger(max) { this.max = max || MAX_PLAYERS - 1; this.p = {}; this.order = []; }
+  /** Host-issued room ledger of remote players: identity (pid+secret token), nickname, room chips, connection state.
+      The client's own bankroll is never trusted: chips are issued by the host (fixed amount, or approve/edit each request)
+      and only the net result (bal - issued) is settled back to the player's local bankroll when they leave.
+      opts: {start: chips issued to each player (0 = none), approve: true = host must approve each join} */
+  var CHIP_MIN = 100, CHIP_MAX = 10000000;
+  function chipAmt(x) { return typeof x === 'number' && isFinite(x) && x === Math.floor(x) && x % 100 === 0 && x >= CHIP_MIN && x <= CHIP_MAX; }
+  function Ledger(max, opts) { if (typeof max === 'object' && max) { opts = max; max = opts.max; } this.max = max || MAX_PLAYERS - 1; this.opts = opts || {}; this.p = {}; this.order = []; }
   Ledger.prototype.join = function (h) {
     var ex = this.p[h.pid];
     if (ex) { if (ex.tok !== h.tok) return { err: 'bad-token' }; ex.conn = true; ex.name = cleanName(h.name); return { player: ex, rejoin: true }; }
     if (this.order.length >= this.max) return { err: 'full' };
-    var bal = typeof h.bal === 'number' ? Math.max(0, Math.min(1e9, Math.floor(h.bal))) : 0;
-    var pl = { pid: h.pid, tok: h.tok, name: cleanName(h.name), bal: bal, conn: true, ready: false, last: null };
+    var o = this.opts, start = chipAmt(o.start) ? o.start : 0, req = chipAmt(h.req) ? h.req : start;
+    var pl = { pid: h.pid, tok: h.tok, name: cleanName(h.name), bal: 0, issued: 0, req: req, status: o.approve ? 'pending' : 'ok', conn: true, ready: false, last: null };
+    if (!o.approve) { pl.bal = pl.issued = start; }
     this.p[h.pid] = pl; this.order.push(h.pid); return { player: pl, rejoin: false };
   };
+  /** Host approves a pending player with amt chips (may differ from the request). Returns '' or an error. */
+  Ledger.prototype.approve = function (pid, amt) {
+    var p = this.p[pid]; if (!p) return '玩家不存在'; if (p.status !== 'pending') return '已批准';
+    if (!chipAmt(amt)) return '金額須為 HK$100 – 10,000,000，並以 100 為單位';
+    p.bal = p.issued = amt; p.status = 'ok'; return '';
+  };
+  Ledger.prototype.reject = function (pid) { var p = this.p[pid]; if (!p || p.status !== 'pending') return false; return this.remove(pid); };
+  /** Host top-up (+) or reduction (-) of a player's room chips; issued moves with it so the net result is unchanged. */
+  Ledger.prototype.adjust = function (pid, delta) {
+    var p = this.p[pid]; if (!p || p.status !== 'ok') return '玩家不存在';
+    if (typeof delta !== 'number' || !isFinite(delta) || delta !== Math.floor(delta) || delta % 100 !== 0 || delta === 0) return '金額須以 100 為單位';
+    if (p.bal + delta < 0) return '籌碼不可少於零';
+    if (p.issued + delta > CHIP_MAX * 10) return '超出上限';
+    p.bal += delta; p.issued += delta; return '';
+  };
+  Ledger.prototype.net = function (pid) { var p = this.p[pid]; return p ? p.bal - p.issued : 0; };
+  Ledger.prototype.active = function () { return this.list().filter(function (p) { return p.status === 'ok'; }); };
+  Ledger.prototype.pending = function () { return this.list().filter(function (p) { return p.status === 'pending'; }); };
   Ledger.prototype.get = function (pid) { return this.p[pid] || null; };
   Ledger.prototype.list = function () { var s = this; return s.order.map(function (id) { return s.p[id]; }); };
   Ledger.prototype.remove = function (pid) { if (!this.p[pid]) return false; delete this.p[pid]; this.order = this.order.filter(function (x) { return x !== pid; }); return true; };
-  Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
-  Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || !(x >= 0)) return false; p.bal += x; return true; };
+  Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
+  Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0)) return false; p.bal += x; return true; };
 
   // ---- 21點 seat rules (host validates every client bet) ----
   var BJ = { maxSeats: 3, numSeats: 7, minBet: 100, maxBet: 20000, sideMax: 1000 };
@@ -2181,7 +2217,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   var CHAT = ['👍', '👏', '🔥', '😂', '😱', '🙏', '💰', '🤞', '好牌！', '加油！', '再嚟！', '唔好意思', '多謝晒', '等等我', '跟你！', '食糊！'];
   var api = { ALPHA: ALPHA, CODE_LEN: CODE_LEN, MAX_PLAYERS: MAX_PLAYERS, MAX_MSG: MAX_MSG, DENOMS: DENOMS, CHAT: CHAT, BJ: BJ, BAC_KEYS: BAC_KEYS,
-    makeCode: makeCode, normCode: normCode, makeId: makeId, cleanName: cleanName, check: check, parseClient: parseClient, Ledger: Ledger,
+    makeCode: makeCode, normCode: normCode, makeId: makeId, cleanName: cleanName, check: check, parseClient: parseClient, Ledger: Ledger, chipAmt: chipAmt,
     bjBetError: bjBetError, bjCanAct: bjCanAct, squeezers: squeezers, roadApply: roadApply, cleanRoadState: cleanRoadState };
   root.MPCore = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -2327,7 +2363,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         self._last = Date.now();
         if (m.t === 'ping') { try { c.send('{"t":"pong"}'); } catch (e) {} return; }
         if (m.t === 'reject') { var f = self._first; self._first = null; self.close(true); if (f) f.reject({ type: m.reason }); else self.emit('closed', m.reason); return; }
-        if (m.t === 'bye') { self.close(true); self.emit('closed', m.reason || 'host-left'); return; }
+        if (m.t === 'bye') { var fb = self._first; self._first = null; self.close(true); if (fb) fb.reject({ type: m.reason || 'host-left' }); else self.emit('closed', m.reason || 'host-left'); return; }
         if (m.t === 'welcome') { self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
         self.emit('msg', m);
       });
@@ -2398,7 +2434,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     timeout: '連線逾時，請檢查網絡後再試', 'host-left': '房主已離開房間', 'host-lost': '與房主失去連線', kicked: '你已被移出房間',
     network: '無法連接配對伺服器，請檢查網絡', 'server-error': '配對伺服器暫時無法使用，請稍後再試', 'socket-error': '無法連接配對伺服器，請檢查網絡',
     'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號衝突，請再試一次',
-    'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', started: '牌局進行中，請稍候再加入'
+    'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', rejected: '房主拒絕了你的加入申請', started: '牌局進行中，請稍候再加入'
   };
   function errText(e) { var k = e && (e.type || e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -3251,7 +3287,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var app = document.createElement('div'); app.id = 'mpApp'; app.className = 'app mp hidden';
   app.innerHTML =
     '<div class="mp-top"><button class="tbtn" id="mpLeave">離開</button><div class="mp-title" id="mpTitle"></div><button class="mp-pill" id="mpPill"></button>' +
-    '<div class="stat"><span>餘額</span><b id="mpBal">HK$0</b></div><div class="mp-tb"><button class="tbtn" id="mpPlBtn">玩家</button><button class="tbtn" id="mpChatBtn">💬</button><button class="tbtn" id="mpCfgBtn">設定</button><button class="tbtn" id="mpSnd">🔊</button></div></div>' +
+    '<div class="stat"><span id="mpBalL">餘額</span><b id="mpBal">HK$0</b></div><div class="mp-tb"><button class="tbtn" id="mpPlBtn">玩家</button><button class="tbtn" id="mpChatBtn">💬</button><button class="tbtn" id="mpCfgBtn">設定</button><button class="tbtn" id="mpSnd">🔊</button></div></div>' +
     '<div class="mp-table" id="mpTable"></div><div class="mp-ctrl" id="mpCtrl"></div>' +
     '<div class="mp-pop hidden" id="mpSide"></div><div class="mp-pop hidden" id="mpChat"></div>' +
     '<div class="mp-ov hidden" id="mpOv"><div class="dlg" id="mpDlg"></div></div><div class="mp-toast" id="mpToast"></div><div id="mpBub"></div>';
@@ -3269,13 +3305,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function closeDialog() { $('mpOv').classList.add('hidden'); }
 
   // ------------------------------------------------------------------ session
-  function myBank(ledger, me) {
+  /** acct = host's own room account {bal, issued} (online rooms); without it (offline table) the local bankroll is used. */
+  function myBank(ledger, me, acct) {
+    var get = function () { return acct ? acct.bal : Wallet.load(); }, set = function (v) { if (acct) acct.bal = v; else Wallet.save(v); };
     return {
-      bal: function (pid) { return pid === me ? Wallet.load() : (ledger && ledger.get(pid) ? ledger.get(pid).bal : 0); },
-      debit: function (pid, x) { if (pid === me) { var b = Wallet.load(); if (!(x >= 0) || b < x) return false; Wallet.save(b - x); return true; } return ledger ? ledger.debit(pid, x) : false; },
-      credit: function (pid, x) { if (pid === me) { if (!(x >= 0)) return false; Wallet.save(Wallet.load() + x); return true; } return ledger ? ledger.credit(pid, x) : false; }
+      bal: function (pid) { return pid === me ? get() : (ledger && ledger.get(pid) && ledger.get(pid).status === 'ok' ? ledger.get(pid).bal : 0); },
+      debit: function (pid, x) { if (pid === me) { var b = get(); if (!(x >= 0) || b < x) return false; set(b - x); return true; } return ledger ? ledger.debit(pid, x) : false; },
+      credit: function (pid, x) { if (pid === me) { if (!(x >= 0)) return false; set(get() + x); return true; } return ledger ? ledger.credit(pid, x) : false; }
     };
   }
+  /** My chips in this room: host-issued room chips online, local bankroll offline. */
+  function myBal() { if (!S) return Wallet.load(); if (S.role === 'client') return S.room ? S.room.bal : 0; return S.acct ? S.acct.bal : Wallet.load(); }
+  // ---- room account record (so a room that ends without a clean exit, e.g. a closed tab, still settles its net result)
+  var ACCT = 'mcasino.acct';
+  function saveAcct() {
+    if (!S || S.role === 'local' || !S.code) return; var a = S.role === 'client' ? S.room : S.acct; if (!a) return;
+    var v = S.role === 'client' ? S.view : S.engine.view(S.me, Date.now()), fin = a.bal + unsettled(v), key = S.code + fin + ':' + a.issued;
+    if (S._acctKey === key) return; S._acctKey = key;
+    try { localStorage.setItem(ACCT, JSON.stringify({ code: S.code, role: S.role, fin: fin, issued: a.issued, t: Date.now() })); } catch (e) {}
+  }
+  function readAcct() { try { var r = JSON.parse(localStorage.getItem(ACCT) || 'null'); return r && typeof r.fin === 'number' && typeof r.issued === 'number' ? r : null; } catch (e) { return null; } }
+  function clearAcct() { try { localStorage.removeItem(ACCT); } catch (e) {} }
+  /** Settle a room's net result (fin - issued) into the local bankroll (never below zero). Returns the net. */
+  function settleNet(fin, issued) { var net = Math.round(fin - issued); Wallet.save(Math.max(0, Wallet.load() + net)); clearAcct(); return net; }
+  function settleLeftover() { var r = readAcct(); if (!r) return; var net = settleNet(r.fin, r.issued); window.Casino.forceLobby(); dialog('上次房間結算', '<p>房間 ' + esc(r.code) + ' 未有正常離開，已按最後紀錄結算：' + (net >= 0 ? '淨贏 ' : '淨輸 ') + fmt(Math.abs(net)) + '，已計入你的本機餘額。</p>', [{ t: '知道了', cls: 'ok', v: true }]); }
+  var STARTS = [10000, 20000, 50000, 100000];
+  function roomFields(o) {
+    o = o || {}; var st = o.start || 20000;
+    return '<div class="mp-f"><label>每位玩家起始籌碼（房間籌碼，由房主發出）</label><div class="mp-seg" id="suStart">' + STARTS.map(function (v) { return '<button data-v="' + v + '"' + (v === st ? ' class="on"' : '') + '>' + fmt(v) + '</button>'; }).join('') + '</div></div>' +
+      '<div class="mp-f"><label>加入方式</label><div class="mp-seg" id="suAppr"><button data-v="1" class="on">房主逐一批准（可修改金額）</button><button data-v="0">自動批准</button></div></div>' +
+      '<p class="mp-note">玩家本機的餘額不會帶入房間；離開時只把房內的淨輸贏計入各自的本機餘額。房主可隨時為玩家補碼或調整。</p>';
+  }
+  function readRoomFields(d, o) { o.start = +d.querySelector('#suStart .on').dataset.v; o.approve = d.querySelector('#suAppr .on').dataset.v === '1'; return o; }
+  function segs(d) { d.querySelectorAll('.mp-seg').forEach(function (seg) { seg.querySelectorAll('button').forEach(function (b) { b.onclick = function () { seg.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); }; }); }); }
   function mkEngine(game, bank, o) {
     if (game === 'bj') return new R.BJRoom({ bank: bank, core: C });
     if (game === 'bac') return new R.BacRoom({ bank: bank, core: K, mode: o.mode, squeeze: o.squeeze !== false });
@@ -3286,30 +3348,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function startHost(game, o, local) {
     o = o || {};
     var id = Net.identity('casino'), name = M.cleanName(U.getName() || '房主');
-    var ledger = new M.Ledger(M.MAX_PLAYERS - 1), me = id.pid;
-    S = { role: local ? 'local' : 'host', game: game, me: me, name: name, ledger: ledger, opts: o, chat: [], status: local ? 'online' : 'connecting' };
-    S.engine = mkEngine(game, myBank(ledger, me), o); S.engine.addPlayer(me, name);
+    if (!local) { var r0 = readAcct(); if (r0) settleNet(r0.fin, r0.issued); }   // an earlier room that never closed cleanly
+    var start = M.chipAmt(o.start) ? o.start : 20000, ledger = new M.Ledger({ max: M.MAX_PLAYERS - 1, start: start, approve: !!o.approve }), me = id.pid;
+    S = { role: local ? 'local' : 'host', game: game, me: me, name: name, ledger: ledger, opts: o, chat: [], status: local ? 'online' : 'connecting', acct: local ? null : { bal: start, issued: start } };
+    S.engine = mkEngine(game, myBank(ledger, me, S.acct), o); S.engine.addPlayer(me, name);
     if (game === 'holdem') { for (var b = 0; b < (o.bots || 0); b++) S.engine.addBot(b + 1, o.level || 'normal', o.style && o.style !== 'mix' ? o.style : null); }
     if (local) { enter(); hostLoop(); return Promise.resolve(); }
     var h = S.net = new Net.Host('casino', PREFIX, { onHello: function (m) { return ledger.join(m); } }), s = S;
     h.on('join', function (pid, m, rejoin) {
       if (S !== s) return; var p = ledger.get(pid);
+      if (p.status === 'pending') { h.send(pid, { t: 'pending', amt: p.req, host: s.name, game: game }); if (!rejoin) { toast(p.name + ' 申請加入（' + fmt(p.req) + '）'); sfx('chip'); openSide(); } s.dirty = true; renderSideIfOpen(); return; }
       s.engine.addPlayer(pid, p.name); s.engine.setOnline(pid, true);
       h.send(pid, { t: 'welcome', game: game, code: s.code, host: s.name, you: pid });
       s.dirty = true; toast(p.name + (rejoin ? ' 已重新連線' : ' 加入了房間')); bubble(pid, rejoin ? '🔌' : '👋');
     });
     h.on('msg', function (pid, m) {
-      if (S !== s) return;
+      if (S !== s) return; var lp = ledger.get(pid); if (!lp || lp.status !== 'ok') return;   // pending players cannot act or chat
       if (m.t === 'chat') { chatIn(pid, ledger.get(pid).name, m.k); h.broadcast({ t: 'chat', pid: pid, name: ledger.get(pid).name, k: m.k }); return; }
       var err = s.engine.handle(pid, m, Date.now()); if (err && err !== 'phase') h.send(pid, { t: 'err', msg: err }); s.dirty = true;
     });
-    h.on('drop', function (pid) { if (S !== s) return; s.engine.setOnline(pid, false); var p = ledger.get(pid); if (p) toast(p.name + ' 已離線'); s.dirty = true; });
+    h.on('drop', function (pid) { if (S !== s) return; if (ledger.get(pid) && ledger.get(pid).status !== 'ok') { s.dirty = true; renderSideIfOpen(); return; } s.engine.setOnline(pid, false); var p = ledger.get(pid); if (p) toast(p.name + ' 已離線'); s.dirty = true; });
     h.on('error', function () {});
     return h.start().then(function (code) { if (S !== s) { h.close(); return; } s.code = code; s.status = 'online'; enter(); hostLoop(); share(true); });
   }
   function playersList() {
-    var s = S, list = [{ pid: s.me, name: s.name, bal: Wallet.load(), on: true, host: true }];
-    s.ledger.list().forEach(function (p) { list.push({ pid: p.pid, name: p.name, bal: p.bal, on: s.net ? s.net.online(p.pid) : false, host: false }); });
+    var s = S, list = [{ pid: s.me, name: s.name, bal: myBal(), net: s.acct ? s.acct.bal - s.acct.issued : 0, on: true, host: true }];
+    s.ledger.active().forEach(function (p) { list.push({ pid: p.pid, name: p.name, bal: p.bal, net: p.bal - p.issued, on: s.net ? s.net.online(p.pid) : false, host: false }); });
     return list;
   }
   function hostLoop() {
@@ -3320,20 +3384,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (s.engine.rev === lastRev && !s.dirty && !s.forceSend) return;
       lastRev = s.engine.rev; s.dirty = false;
       var pl = playersList(); s.players = pl;
-      if (s.net) s.ledger.list().forEach(function (p) { if (s.net.online(p.pid)) s.net.send(p.pid, { t: 'snap', v: s.engine.view(p.pid, now), pl: pl, you: { bal: p.bal } }); });
-      onView(s.engine.view(s.me, now), pl, Wallet.load());
+      if (s.net) s.ledger.active().forEach(function (p) { if (s.net.online(p.pid)) s.net.send(p.pid, { t: 'snap', v: s.engine.view(p.pid, now), pl: pl, you: { bal: p.bal, issued: p.issued } }); });
+      onView(s.engine.view(s.me, now), pl, myBal()); saveAcct();
     }, TICK);
   }
   function join(code) {
     if (!Net.available()) return Promise.reject({ type: 'browser-incompatible' });
+    var r0 = readAcct(); if (r0 && !(r0.role === 'client' && r0.code === code)) settleNet(r0.fin, r0.issued);
     var id = Net.identity('casino'), name = M.cleanName(U.getName() || '玩家');
     var s = S = { role: 'client', me: id.pid, name: name, code: code, chat: [], status: 'connecting' };
-    var c = s.net = new Net.Client('casino', PREFIX, code, { t: 'hello', v: 1, app: 'casino', pid: id.pid, tok: id.tok, name: name, bal: Wallet.load() });
+    var c = s.net = new Net.Client('casino', PREFIX, code, { t: 'hello', v: 1, app: 'casino', pid: id.pid, tok: id.tok, name: name, req: reqAmount() });
     c.on('msg', function (m) {
       if (S !== s) return;
-      if (m.t === 'snap' && m.v && typeof m.v === 'object') { var b = +((m.you || {}).bal); if (b >= 0 && isFinite(b)) Wallet.save(b); onView(m.v, Array.isArray(m.pl) ? m.pl.slice(0, 7) : [], Wallet.load()); }
+      if (m.t === 'snap' && m.v && typeof m.v === 'object') { var y = m.you || {}, b = +y.bal, is = +y.issued; if (b >= 0 && isFinite(b) && is >= 0 && isFinite(is)) s.room = { bal: b, issued: is }; onView(m.v, Array.isArray(m.pl) ? m.pl.slice(0, 7) : [], myBal()); saveAcct(); }
+      else if (m.t === 'pending') { s.pendingAmt = +m.amt || 0; var wt = document.querySelector('#mpDlg .mp-wait2'); if (wt) wt.textContent = '已連線，等待房主批准你的申請（起始籌碼 ' + fmt(s.pendingAmt) + '）…'; }
       else if (m.t === 'chat') chatIn(String(m.pid || ''), M.cleanName(m.name), m.k);
       else if (m.t === 'err') { toast(String(m.msg).slice(0, 40)); sfx('click'); }
+      else if (m.t === 'chips' && isFinite(+m.d)) { toast('房主' + (+m.d > 0 ? '為你補碼 ' : '扣減了你的籌碼 ') + fmt(Math.abs(+m.d))); sfx('chip'); }
       else if (m.t === 'welcome' && s.game && s.entered) toast('已重新連線');
     });
     c.on('status', function (st) { if (S !== s) return; s.status = st; top(); if (st === 'reconnecting') toast('連線中斷，正在重新連線…'); });
@@ -3361,11 +3428,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function endSession(reason) {
     var s = S; if (!s) return; S = null;
     clearInterval(s.loop); try { sessionStorage.removeItem('mcasino.room'); } catch (e) {}
-    if (s.role === 'client') { var r = unsettled(s.view); if (r > 0) Wallet.save(Wallet.load() + r); if (s.net) s.net.close(true); }
-    else { var v = s.engine.view(s.me, Date.now()), rr = unsettled(v); if (rr > 0) Wallet.save(Wallet.load() + rr); if (s.net) s.net.close(); }
+    var net = null;
+    if (s.role === 'local') { var v = s.engine.view(s.me, Date.now()), rr = unsettled(v); if (rr > 0) Wallet.save(Wallet.load() + rr); }
+    else if (s.role === 'client') { if (s.room) net = settleNet(s.room.bal + unsettled(s.view), s.room.issued); if (s.net) s.net.close(true); }
+    else { var hv = s.engine.view(s.me, Date.now()); net = settleNet(s.acct.bal + unsettled(hv), s.acct.issued); if (s.net) s.net.close(); }
+    s.settled = net;
     UI.seen = {}; UI.hidden = {}; UI.ctrlKey = '';
     window.Casino.forceLobby();
-    if (reason) dialog('已離開房間', '<p>' + esc(reason) + '。' + (s.role === 'client' ? '未完成牌局的注碼已退回你的餘額。' : '') + '</p>', [{ t: '知道了', cls: 'ok', v: true }]);
+    var st = net == null ? '' : '本房結算：' + (net > 0 ? '淨贏 ' + fmt(net) : net < 0 ? '淨輸 ' + fmt(-net) : '不輸不贏') + '，已計入你的本機餘額（' + fmt(Wallet.load()) + '）。';
+    if (reason) dialog('已離開房間', '<p>' + esc(reason) + '。' + (s.role === 'client' ? '未完成牌局的注碼已退回。' : '') + '</p>' + (st ? '<p class="mp-settle">' + st + '</p>' : ''), [{ t: '知道了', cls: 'ok', v: true }]);
+    else if (st) dialog('已離開房間', '<p class="mp-settle">' + st + '</p>', [{ t: '知道了', cls: 'ok', v: true }]);
   }
   function leave() {
     if (!S) return;
@@ -3401,11 +3473,47 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     host.appendChild(b); setTimeout(function () { b.remove(); }, 3200);
   }
   function renderSide() {
-    var s = S; if (!s) return; var pl = s.players || [];
-    $('mpSide').innerHTML = '<h4>' + (s.role === 'local' ? '牌桌' : '房間 ' + (s.code || '')) + '</h4><ul>' + pl.map(function (p) {
-      return '<li class="' + (p.on ? '' : 'off') + '" data-pid="' + esc(p.pid) + '"><span>' + esc(p.name) + (p.host ? ' <i>房主</i>' : '') + (p.pid === s.me ? ' <i class="me">你</i>' : '') + '</span><b>' + fmt(p.bal) + '</b>' + (p.on ? '' : '<small>離線</small>') + '</li>';
-    }).join('') + '</ul>' + (s.role !== 'local' ? '<button class="tbtn" id="mpShare2">邀請朋友（房號／QR）</button>' : '');
+    var s = S; if (!s) return; var pl = s.players || [], host = s.role === 'host', side = $('mpSide');
+    var keep = {}; side.querySelectorAll('input[data-amt]').forEach(function (i) { keep[i.dataset.amt] = i.value; });
+    var pend = host ? s.ledger.pending() : [];
+    side.innerHTML = '<h4>' + (s.role === 'local' ? '牌桌' : '房間 ' + (s.code || '')) + '</h4>' +
+      (pend.length ? '<div class="mp-pend"><h5>待批准加入（' + pend.length + '）</h5>' + pend.map(function (p) {
+        return '<div class="mp-preq" data-pid="' + esc(p.pid) + '"><div><b>' + esc(p.name) + '</b>' + (s.net && s.net.online(p.pid) ? '' : ' <small>離線</small>') + '<small>申請 ' + fmt(p.req) + '</small></div>' +
+          '<div class="mp-prow"><input type="number" inputmode="numeric" min="100" step="100" data-amt="' + esc(p.pid) + '" value="' + esc(keep[p.pid] != null ? keep[p.pid] : p.req) + '"><button class="tbtn go" data-ok="' + esc(p.pid) + '">批准</button><button class="tbtn" data-no="' + esc(p.pid) + '">拒絕</button></div></div>';
+      }).join('') + '</div>' : '') +
+      '<ul>' + pl.map(function (p) {
+        var net = s.role !== 'local' && typeof p.net === 'number' ? '<em class="' + (p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '') + '">' + (p.net > 0 ? '+' : p.net < 0 ? '−' : '±') + fmt(Math.abs(p.net)) + '</em>' : '';
+        return '<li class="' + (p.on ? '' : 'off') + '" data-pid="' + esc(p.pid) + '"><span>' + esc(p.name) + (p.host ? ' <i>房主</i>' : '') + (p.pid === s.me ? ' <i class="me">你</i>' : '') + '</span><b>' + fmt(p.bal) + '</b>' + net + (p.on ? '' : '<small>離線</small>') +
+          (host ? '<button class="tbtn mp-adj" data-adj="' + esc(p.pid) + '">調整</button>' : '') + '</li>';
+      }).join('') + '</ul>' + (s.role !== 'local' ? '<p class="mp-note">金額為房間籌碼（由房主發出）；括號為本房淨輸贏，離開時計入本機餘額。</p><button class="tbtn" id="mpShare2">邀請朋友（房號／QR）</button>' : '');
     var sh = $('mpShare2'); if (sh) sh.onclick = function () { share(false); };
+    side.querySelectorAll('[data-ok]').forEach(function (b) { b.onclick = function () { approve(b.dataset.ok, +side.querySelector('input[data-amt="' + b.dataset.ok + '"]').value); }; });
+    side.querySelectorAll('[data-no]').forEach(function (b) { b.onclick = function () { reject(b.dataset.no); }; });
+    side.querySelectorAll('[data-adj]').forEach(function (b) { b.onclick = function () { adjust(b.dataset.adj); }; });
+    S._sideKey = sideKey();
+  }
+  function sideKey() { var s = S; return s ? JSON.stringify([s.players, s.role === 'host' ? s.ledger.pending().map(function (p) { return p.pid + (s.net && s.net.online(p.pid)); }) : 0]) : ''; }
+  function renderSideIfOpen() { if (S && !$('mpSide').classList.contains('hidden') && S._sideKey !== sideKey()) renderSide(); }
+  function openSide() { $('mpChat').classList.add('hidden'); $('mpSide').classList.remove('hidden'); renderSide(); }
+  /** Host: approve a pending join with amt room chips (validated in the ledger). */
+  function approve(pid, amt) {
+    var s = S; if (!s || s.role !== 'host') return; var p = s.ledger.get(pid); if (!p) return;
+    var err = s.ledger.approve(pid, amt); if (err) { toast(err); return err; }
+    s.engine.addPlayer(pid, p.name); s.engine.setOnline(pid, s.net.online(pid));
+    s.net.send(pid, { t: 'welcome', game: s.game, code: s.code, host: s.name, you: pid, chips: amt });
+    toast('已批准 ' + p.name + '（' + fmt(amt) + '）'); bubble(pid, '👋'); s.dirty = true; renderSide(); top(); return '';
+  }
+  function reject(pid) { var s = S; if (!s || s.role !== 'host') return; var p = s.ledger.get(pid); if (!p || !s.ledger.reject(pid)) return; s.net.kick(pid, 'rejected'); toast('已拒絕 ' + p.name); s.dirty = true; renderSide(); top(); }
+  /** Host: top-up (+) or reduce (−) a player's room chips (own chips too). Net result is unchanged. */
+  function adjust(pid) {
+    var s = S; if (!s || s.role !== 'host') return; var mine = pid === s.me, p = mine ? null : s.ledger.get(pid), cur = mine ? s.acct.bal : p && p.bal; if (cur == null) return;
+    dialog('調整房間籌碼 · ' + (mine ? s.name : p.name), '<p>目前 ' + fmt(cur) + '。輸入要補碼（正數）或扣減（負數）的金額，以 100 為單位。</p><input type="number" inputmode="numeric" step="100" id="adjV" value="10000"><p class="mp-note">補碼／扣減不計作輸贏；離開時只結算淨輸贏。</p>',
+      [{ t: '取消', v: false }, { t: '確定', cls: 'ok', v: function (d) { return { v: +d.querySelector('#adjV').value }; } }]).then(function (r) {
+      if (!r || S !== s) return; var dlt = r.v, err;
+      if (mine) { err = !(dlt === Math.floor(dlt) && dlt % 100 === 0 && dlt !== 0) ? '金額須以 100 為單位' : s.acct.bal + dlt < 0 ? '籌碼不可少於零' : ''; if (!err) { s.acct.bal += dlt; s.acct.issued += dlt; } }
+      else err = s.ledger.adjust(pid, dlt);
+      if (err) toast(err); else { toast((dlt > 0 ? '已補碼 ' : '已扣減 ') + fmt(Math.abs(dlt))); s.dirty = true; if (!mine) s.net.send(pid, { t: 'chips', d: dlt }); }
+    });
   }
   function share(first) {
     if (!S || !S.code) return; var url = U.shareUrl('casino/', S.code);
@@ -3456,7 +3564,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $('mpChatBtn').classList.toggle('hidden', S.role === 'local');
     $('mpPlBtn').textContent = '玩家 ' + ((S.players || []).length || 1);
     $('mpSnd').textContent = Wallet.muted() ? '🔇' : '🔊';
-    $('mpBal').textContent = fmt(Wallet.load());
+    $('mpBal').textContent = fmt(myBal()); $('mpBalL').textContent = S.role === 'local' ? '餘額' : '房間籌碼';
+    var pc = S.role === 'host' ? S.ledger.pending().length : 0; if (pc) $('mpPlBtn').textContent += ' · 待批 ' + pc; $('mpPlBtn').classList.toggle('alert', !!pc);
   }
 
   // ------------------------------------------------------------------ view dispatch
@@ -3466,7 +3575,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!S.entered || !v || !v.g) return;
     if (v.fx) v.fx.forEach(function (e) { if (e.seq > UI.lastFx) { UI.lastFx = e.seq; if (prev) fxShow(e, v); } });
     if (v.g === 'bj') renderBJ(v); else if (v.g === 'bac') renderBac(v); else renderHoldem(v);
-    top(); if (!$('mpSide').classList.contains('hidden')) renderSide();
+    top(); renderSideIfOpen();
   }
   function nameOf(pid) { var p = (S.players || []).filter(function (x) { return x.pid === pid; })[0]; return p ? p.name : ''; }
   function fxShow(e, v) {
@@ -3638,10 +3747,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
   function buyIn(v, seat, rebuy) {
-    var bal = Wallet.load(), cur = rebuy ? v.seats[seat].stack : 0, max = Math.min(v.maxBuy - cur, bal), min = rebuy ? Math.min(v.bb * 10, max) : v.minBuy, def = Math.min(max, rebuy ? v.maxBuy / 2 - cur : v.bb * 100);
+    var bal = myBal(), cur = rebuy ? v.seats[seat].stack : 0, max = Math.min(v.maxBuy - cur, bal), min = rebuy ? Math.min(v.bb * 10, max) : v.minBuy, def = Math.min(max, rebuy ? v.maxBuy / 2 - cur : v.bb * 100);
     if (max < min || max <= 0) { toast('餘額不足（最少 ' + fmt(min) + '）'); return; }
     def = Math.max(min, def);
-    dialog(rebuy ? '補碼' : '買入籌碼', '<p>從你的餘額 ' + fmt(bal) + ' 兌換檯面籌碼</p><input type="range" id="biR" min="' + min + '" max="' + max + '" step="' + v.bb + '" value="' + def + '"><div class="mp-biv" id="biV"></div>',
+    dialog(rebuy ? '補碼' : '買入籌碼', '<p>從你的' + (S.role === 'local' ? '餘額 ' : '房間籌碼 ') + fmt(bal) + ' 兌換檯面籌碼</p><input type="range" id="biR" min="' + min + '" max="' + max + '" step="' + v.bb + '" value="' + def + '"><div class="mp-biv" id="biV"></div>',
       [{ t: '取消', v: false }, { t: rebuy ? '補碼' : '坐下', cls: 'ok', v: function (d) { return +d.querySelector('#biR').value; } }], function (d) { var r = d.querySelector('#biR'), o = d.querySelector('#biV'); var f = function () { o.textContent = fmt(+r.value); }; r.oninput = f; f(); })
       .then(function (amt) { if (!amt) return; send(rebuy ? { t: 'rebuy', buy: amt } : { t: 'sit', seat: seat, buy: amt }); sfx('chip'); });
   }
@@ -3651,7 +3760,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var box = document.createElement('div'); box.className = 'lb-mp'; box.id = 'lbMP';
     box.innerHTML = '<div class="lb-sec">朋友同枱 · 聯機</div><div class="lb-mprow"><label>暱稱</label><input id="lbName" maxlength="12" placeholder="你的名稱" value="' + esc(U.getName()) + '"></div>' +
       '<div class="lb-mprow"><button class="tbtn" id="lbHostBJ">開房 21點</button><button class="tbtn" id="lbHostBAC">開房 百家樂</button><button class="tbtn" id="lbHostPK">開房 德州撲克</button></div>' +
-      '<div class="lb-mprow"><input id="lbCode" maxlength="7" placeholder="輸入 6 位房號" autocomplete="off" spellcheck="false"><button class="tbtn go" id="lbJoin">加入</button></div><div class="lb-mpnote">點對點聯機（WebRTC）· 最多 7 人 · 每人使用自己的籌碼餘額</div>';
+      '<div class="lb-mprow"><label>申請籌碼</label><select id="lbReq">' + STARTS.map(function (v) { return '<option value="' + v + '">' + fmt(v) + '</option>'; }).join('') + '</select></div><div class="lb-mprow"><input id="lbCode" maxlength="7" placeholder="輸入 6 位房號" autocomplete="off" spellcheck="false"><button class="tbtn go" id="lbJoin">加入</button></div><div class="lb-mpnote">點對點聯機（WebRTC）· 最多 7 人 · 房間籌碼由房主發出，離開時只結算淨輸贏</div>';
     return box;
   }
   function saveName() { var i = $('lbName'); if (i) U.setName(i.value); }
@@ -3659,10 +3768,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     dialog('聯機', '<p class="mp-wait2">' + esc(txt) + '</p>', [{ t: '取消', v: 'cancel' }]).then(function (r) { if (r === 'cancel' && S && !S.entered) { var s = S; S = null; try { s.net && s.net.close(true); } catch (e) {} } });
     return p.then(function () { closeDialog(); }, function (e) { closeDialog(); S = null; dialog('未能連線', '<p>' + esc(U.errText(e)) + '</p>', [{ t: '知道了', cls: 'ok', v: true }]); });
   }
+  function reqAmount() { var v = 20000; try { v = +($('lbReq') ? $('lbReq').value : localStorage.getItem('mp.req')) || 20000; } catch (e) {} return M.chipAmt(v) ? v : 20000; }
   function hostRoom(game) {
     saveName(); if (!Net.available()) { dialog('未能聯機', '<p>' + U.errText('browser-incompatible') + '</p>'); return; }
     if (game === 'holdem') return holdemSetup(true);
-    wait('正在開房…', startHost(game, { mode: 'comm', squeeze: true }));
+    dialog('開房 · ' + GNAME[game], roomFields(), [{ t: '取消', v: false }, { t: '開房', cls: 'ok', v: function (d) { return readRoomFields(d, { mode: 'comm', squeeze: true }); } }], segs).then(function (o) { if (o) wait('正在開房…', startHost(game, o)); });
   }
   function joinRoom(code) {
     saveName(); code = M.normCode(code); if (!code) { dialog('房號錯誤', '<p>房號應為 6 位英文字母／數字。</p>'); return; }
@@ -3675,8 +3785,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     dialog(online ? '開房 · 德州撲克' : '德州撲克 · 電腦對戰', '<div class="mp-f"><label>盲注 (HK$)</label><div class="mp-seg" id="suBl">' + lv + '</div></div>' +
       '<div class="mp-f"><label>' + (online ? '電腦補位' : '電腦玩家') + '</label><div class="mp-seg" id="suN">' + (online ? [0, 1, 2, 3, 4] : [1, 2, 3, 4, 5, 6, 7, 8]).map(function (n) { return '<button data-v="' + n + '"' + (n === (online ? 2 : 5) ? ' class="on"' : '') + '>' + n + '</button>'; }).join('') + '</div></div>' +
       '<div class="mp-f"><label>難度</label><div class="mp-seg" id="suLv">' + levels + '</div></div><div class="mp-f"><label>風格</label><div class="mp-seg wrap" id="suSt">' + styles + '</div></div>' +
-      '<p class="mp-note">無限注德州撲克 · 買入 40–200 個大盲 · 每手 20 秒行動時間。電腦玩家看不到你的底牌。</p>',
-      [{ t: '取消', v: false }, { t: online ? '開房' : '開始', cls: 'ok', v: function (d) { var g = function (id) { return d.querySelector('#' + id + ' .on').dataset.v; }; return { blinds: +g('suBl'), bots: +g('suN'), level: g('suLv'), style: g('suSt') }; } }],
+      '<p class="mp-note">無限注德州撲克 · 買入 40–200 個大盲 · 每手 20 秒行動時間。電腦玩家看不到你的底牌。</p>' + (online ? roomFields({ start: 20000 }) : ''),
+      [{ t: '取消', v: false }, { t: online ? '開房' : '開始', cls: 'ok', v: function (d) { var g = function (id) { return d.querySelector('#' + id + ' .on').dataset.v; }; var o = { blinds: +g('suBl'), bots: +g('suN'), level: g('suLv'), style: g('suSt') }; if (online) { readRoomFields(d, o); if (o.start < PK.BLINDS[o.blinds].bb * 40) { toast('起始籌碼少於此盲注的最低買入 ' + fmt(PK.BLINDS[o.blinds].bb * 40)); return false; } } return o; } }],
       function (d) { d.querySelectorAll('.mp-seg').forEach(function (seg) { seg.querySelectorAll('button').forEach(function (b) { b.onclick = function () { seg.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); }; }); }); })
       .then(function (o) {
         if (!o) return;
@@ -3700,6 +3810,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $('lbJoin').onclick = function () { joinRoom($('lbCode').value); };
     $('lbCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') joinRoom($('lbCode').value); });
     $('lbName').addEventListener('change', saveName);
+    try { var rq = +localStorage.getItem('mp.req'); if (STARTS.indexOf(rq) >= 0) $('lbReq').value = String(rq); else $('lbReq').value = '20000'; } catch (e) { $('lbReq').value = '20000'; }
+    $('lbReq').addEventListener('change', function () { try { localStorage.setItem('mp.req', $('lbReq').value); } catch (e) {} });
   }
   installLobby();
   window.Casino.register('mp', { app: 'mpApp', api: function () { return { enter: function () { if (!S) setTimeout(window.Casino.forceLobby); else top(); }, canLeave: function () { return !S; }, leave: function () {}, toast: function () { leave(); } }; } });
@@ -3714,7 +3826,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   // deep link #join=CODE or silent rejoin after reload
   setTimeout(function () {
     var hc = window.__joinHash ? M.normCode((/join=([A-Za-z0-9-]{6,8})/.exec(window.__joinHash) || [])[1]) : null; window.__joinHash = null; if (hc) { $('lbCode').value = hc; if (U.getName()) joinRoom(hc); else { $('lbName').focus(); dialog('加入房間 ' + hc, '<p>請先輸入暱稱，然後撳「加入」。</p>'); } return; }
-    var rc = null; try { rc = sessionStorage.getItem('mcasino.room'); } catch (e) {} if (rc && M.normCode(rc)) joinRoom(rc);
+    var rc = null; try { rc = sessionStorage.getItem('mcasino.room'); } catch (e) {} rc = rc && M.normCode(rc);
+    var rec = readAcct();
+    if (rc && rec && rec.role === 'client' && rec.code === rc) { wait('正在重新加入房間 ' + rc + '…', join(rc).catch(function (e) { setTimeout(settleLeftover, 50); throw e; })); return; }
+    if (rec) settleLeftover();
+    if (rc) joinRoom(rc);
   }, 50);
 })();
 </script>
