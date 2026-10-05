@@ -2165,6 +2165,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   Ledger.prototype.remove = function (pid) { if (!this.p[pid]) return false; delete this.p[pid]; this.order = this.order.filter(function (x) { return x !== pid; }); return true; };
   Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
   Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0)) return false; p.bal += x; return true; };
+  /** Plain snapshot for a voluntary host handoff. Includes the secret tok so the new host can recognise the same device. */
+  Ledger.prototype.export = function () {
+    var o = this.opts || {};
+    return { max: this.max, start: o.start || 0, approve: !!o.approve, players: this.list().map(function (p) {
+      return { pid: p.pid, tok: p.tok, name: p.name, bal: p.bal, issued: p.issued, status: p.status, req: p.req || 0 };
+    }) };
+  };
+  /** Rebuild a ledger from a host snapshot. Returns null if anything is the wrong shape (never invents chips). */
+  Ledger.restore = function (d) {
+    if (!d || !Array.isArray(d.players) || d.players.length > MAX_PLAYERS - 1) return null;
+    var start = d.start == null ? 0 : d.start;
+    if (start !== 0 && !chipAmt(start)) return null;
+    var L = new Ledger({ max: MAX_PLAYERS - 1, start: start, approve: !!d.approve }), seen = {};
+    for (var i = 0; i < d.players.length; i++) {
+      var p = d.players[i];
+      if (!p || typeof p.pid !== 'string' || !/^[0-9a-f]{16}$/.test(p.pid) || typeof p.tok !== 'string' || !/^[0-9a-f]{32}$/.test(p.tok)) return null;
+      if (seen[p.pid] || (p.status !== 'ok' && p.status !== 'pending')) return null;
+      if (typeof p.bal !== 'number' || typeof p.issued !== 'number' || !isFinite(p.bal) || !isFinite(p.issued)) return null;
+      if (p.bal < 0 || p.issued < 0 || p.bal > CHIP_MAX * 20 || p.issued > CHIP_MAX * 20) return null;
+      seen[p.pid] = 1;
+      L.p[p.pid] = { pid: p.pid, tok: p.tok, name: cleanName(p.name), bal: p.bal, issued: p.issued, req: chipAmt(p.req) ? p.req : start, status: p.status, conn: false, ready: false, last: null };
+      L.order.push(p.pid);
+    }
+    return L;
+  };
 
   // ---- 21點 seat rules (host validates every client bet) ----
   var BJ = { maxSeats: 3, numSeats: 7, minBet: 100, maxBet: 20000, sideMax: 1000 };
@@ -2228,9 +2253,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 (function (root) {
   'use strict';
   var M = root.MPCore;
-  var DEFAULT_ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+  // STUN finds a public address; the PeerJS public TURN relays carry the data channel when both
+  // sides are behind symmetric NAT (typical on mobile). Passing iceServers replaces PeerJS defaults,
+  // so these relays have to be listed here or phones often never connect. Credentials are the public
+  // ones shipped with PeerJS, not a private key.
+  var DEFAULT_ICE = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    { urls: ['turn:eu-0.turn.peerjs.com:3478?transport=udp', 'turn:us-0.turn.peerjs.com:3478?transport=udp', 'turn:eu-0.turn.peerjs.com:3478?transport=tcp', 'turn:us-0.turn.peerjs.com:3478?transport=tcp'], username: 'peerjs', credential: 'peerjsp' }
+  ];
   function ice() { return root.NET_ICE || DEFAULT_ICE; }
-  function peerOpts() { var o = { debug: 0, config: { iceServers: ice() } }; if (root.NET_PEER_SERVER) for (var k in root.NET_PEER_SERVER) o[k] = root.NET_PEER_SERVER[k]; return o; }
+  function peerOpts() {
+    var o = { debug: 0, config: { iceServers: ice(), sdpSemantics: 'unified-plan' } };
+    if (root.NET_PEER_SERVER) for (var k in root.NET_PEER_SERVER) o[k] = root.NET_PEER_SERVER[k];
+    return o;
+  }
+  function bindForeground(self, fn) {
+    unbindForeground(self);
+    if (typeof document === 'undefined' || !document.addEventListener) return;
+    self._vis = function () { if (!document.hidden && !self.closed) fn(); };
+    self._show = function (e) { if ((!e || e.persisted) && !self.closed) fn(); };
+    document.addEventListener('visibilitychange', self._vis);
+    if (typeof window !== 'undefined') window.addEventListener('pageshow', self._show);
+  }
+  function unbindForeground(self) {
+    if (typeof document !== 'undefined' && self._vis) document.removeEventListener('visibilitychange', self._vis);
+    if (typeof window !== 'undefined' && self._show) window.removeEventListener('pageshow', self._show);
+  }
   function Emitter() { this._h = {}; }
   Emitter.prototype.on = function (e, f) { (this._h[e] = this._h[e] || []).push(f); return this; };
   Emitter.prototype.emit = function (e) { var a = [].slice.call(arguments, 1); (this._h[e] || []).slice().forEach(function (f) { try { f.apply(null, a); } catch (x) { setTimeout(function () { throw x; }); } }); };
@@ -2242,7 +2290,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!v || !/^[0-9a-f]{16}$/.test(v.pid) || !/^[0-9a-f]{32}$/.test(v.tok)) { v = { pid: M.makeId(2), tok: M.makeId(4) }; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     return v;
   }
-  var PING_MS = 4000, HOST_DEAD_MS = 14000, CLIENT_DEAD_MS = 13000, RETRY_MS = 2500, GIVE_UP_MS = 60000;
+  var PING_MS = 4000, HOST_DEAD_MS = 14000, CLIENT_DEAD_MS = 13000, RETRY_MS = 2500, GIVE_UP_MS = 50000, REJOIN_MS = 180000;
+  var OPEN_MS = 20000, NO_ROOM_TRIES = 2, MISS_MS = 500, MISS_OPEN_MS = 1800;
+  var HANDOFF_MS = 700, CLAIM_TRIES = 12, CLAIM_GAP = 400, CLAIM_OPEN_MS = 3000;
 
   // ---------------- Host ----------------
   function Host(app, prefix, opts) {
@@ -2258,6 +2308,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         p.on('error', function (e) {
           if (!settled) { settled = true; try { p.destroy(); } catch (x) {} if (e.type === 'unavailable-id' && ++tries < 5) return attempt(); return reject(e); }
           self.emit('error', e);
+          if (!self.closed && e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed')) {
+            setTimeout(function () { if (!self.closed && !p.destroyed && p.disconnected) try { p.reconnect(); } catch (x) {} }, 1500);
+          }
         });
       }
       attempt();
@@ -2267,6 +2320,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var self = this, p = this.peer;
     p.on('disconnected', function () { if (!self.closed) setTimeout(function () { if (!self.closed && p.disconnected && !p.destroyed) p.reconnect(); }, 1500); });
     p.on('connection', function (c) { self._accept(c); });
+    bindForeground(this, function () { if (!p.destroyed && p.disconnected) try { p.reconnect(); } catch (e) {} });
     this._tick = setInterval(function () {
       var now = Date.now();
       Object.keys(self.conns).forEach(function (pid) {
@@ -2310,9 +2364,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   Host.prototype.kick = function (pid, reason) { var e = this.conns[pid]; if (e) { this._raw(e.c, { t: 'bye', reason: reason || 'kicked' }); var self = this; setTimeout(function () { self._drop(pid, 'kicked'); }, 200); } };
   Host.prototype.online = function (pid) { return !!this.conns[pid]; };
   Host.prototype.close = function () {
-    if (this.closed) return; this.closed = true; clearInterval(this._tick);
+    if (this.closed) return; this.closed = true; clearInterval(this._tick); unbindForeground(this);
     this.broadcast({ t: 'bye', reason: 'host-left' });
     var p = this.peer; setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 300);
+  };
+  /** Take over an existing room code once the previous host has released that peer id. */
+  Host.prototype.claim = function (code) {
+    var self = this, tries = 0;
+    this.code = code;
+    return new Promise(function (resolve, reject) {
+      function attempt() {
+        if (self.closed) return reject({ type: 'closed' });
+        var p = new root.Peer(self.prefix + code, peerOpts()), settled = false;
+        var timer = setTimeout(function () {
+          if (settled) return;
+          settled = true; try { p.destroy(); } catch (x) {}
+          if (++tries < CLAIM_TRIES) return setTimeout(attempt, CLAIM_GAP);
+          reject({ type: 'timeout' });
+        }, CLAIM_OPEN_MS);
+        p.on('open', function () {
+          if (settled || self.closed) { try { p.destroy(); } catch (x) {} return; }
+          settled = true; clearTimeout(timer);
+          self.peer = p; self.code = code; self._wire(); resolve(code);
+        });
+        p.on('error', function (e) {
+          if (settled) { if (!self.closed) self.emit('error', e); return; }
+          settled = true; clearTimeout(timer); try { p.destroy(); } catch (x) {}
+          if (e && e.type === 'unavailable-id' && ++tries < CLAIM_TRIES) return setTimeout(attempt, CLAIM_GAP);
+          reject(e || { type: 'unavailable-id' });
+        });
+      }
+      attempt();
+    });
+  };
+  /** Hand the room to one connected player: full state to them, reconnect notice to everyone else, then release the peer id. */
+  Host.prototype.transfer = function (pid, state) {
+    if (this.closed) return;
+    this.closed = true; clearInterval(this._tick); unbindForeground(this);
+    this.send(pid, { t: 'handoff', state: state });
+    this.broadcast({ t: 'bye', reason: 'handoff' }, pid);
+    this.send(pid, { t: 'bye', reason: 'claim' });
+    var p = this.peer; this.peer = null;
+    setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 200);
   };
 
   // ---------------- Client ----------------
@@ -2335,10 +2428,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var p = new root.Peer(peerOpts()), done = false; self.peer = p;
       p.on('open', function () { if (!done) { done = true; res(p); } });
       p.on('error', function (e) {
-        if (e.type === 'peer-unavailable') { self._fail('no-room'); return; }
+        if (self.peer !== p) return;
+        // The broker sometimes answers "no such peer" for a live room (host just registered, or its
+        // signalling socket blipped). Retry a few times on a fresh peer: reusing the same peer drops
+        // the next EXPIRE and the attempt hangs until the open timeout.
+        if (e.type === 'peer-unavailable') {
+          self._miss = (self._miss || 0) + 1;
+          self.peer = null;
+          try { p.destroy(); } catch (x) {}
+          if (self._first && self._miss >= NO_ROOM_TRIES) { self._fail('no-room'); return; }
+          self._retry(MISS_MS); return;
+        }
         if (!done) { done = true; rej(e); }
+        else if (!self.closed && e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed')) self._retry();
       });
       p.on('disconnected', function () { if (!self.closed) setTimeout(function () { if (!self.closed && !p.destroyed && p.disconnected) try { p.reconnect(); } catch (x) {} }, 1500); });
+      bindForeground(self, function () {
+        if (self.peer && !self.peer.destroyed && self.peer.disconnected) try { self.peer.reconnect(); } catch (e) {}
+        if (self.state === 'online' && (!self.conn || !self.conn.open)) self._retry(0);
+      });
     });
   };
   Client.prototype._fail = function (why) {
@@ -2353,7 +2461,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (self.closed) return;
       var c = p.connect(self.hostId, { reliable: true, serialization: 'raw' }), opened = false;
       self.conn = c;
-      var to = setTimeout(function () { if (!opened && self.conn === c) { try { c.close(); } catch (e) {} self._retry(); } }, 12000);
+      // After the broker has already said the room is missing, don't wait out a full ICE timeout.
+      var to = setTimeout(function () {
+        if (opened || self.conn !== c) return;
+        try { c.close(); } catch (e) {}
+        if (!self._wasOnline && self._miss) {
+          self._miss++;
+          if (self._first && self._miss >= NO_ROOM_TRIES) { self._fail('no-room'); return; }
+        }
+        self._retry();
+      }, self._miss ? MISS_OPEN_MS : OPEN_MS);
       c.on('open', function () { opened = true; clearTimeout(to); self._last = Date.now(); c.send(JSON.stringify(self.hello)); });
       c.on('data', function (raw) {
         if (self.conn !== c) return;
@@ -2363,8 +2480,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         self._last = Date.now();
         if (m.t === 'ping') { try { c.send('{"t":"pong"}'); } catch (e) {} return; }
         if (m.t === 'reject') { var f = self._first; self._first = null; self.close(true); if (f) f.reject({ type: m.reason }); else self.emit('closed', m.reason); return; }
+        if (m.t === 'handoff') { self._migrate = m; return; }
+        if (m.t === 'bye' && m.reason === 'handoff') { self.emit('migrate'); self._retry(HANDOFF_MS); return; }
+        if (m.t === 'bye' && m.reason === 'claim') {
+          var payload = self._migrate || null, f2 = self._first; self._first = null; self.close(true); self.emit('claim', payload);
+          if (f2) f2.reject({ type: 'claim' }); return;
+        }
         if (m.t === 'bye') { var fb = self._first; self._first = null; self.close(true); if (fb) fb.reject({ type: m.reason || 'host-left' }); else self.emit('closed', m.reason || 'host-left'); return; }
-        if (m.t === 'welcome') { self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
+        if (m.t === 'welcome') { self._miss = 0; self._wasOnline = true; self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
         self.emit('msg', m);
       });
       c.on('close', function () { clearTimeout(to); if (self.conn === c && !self.closed) self._retry(); });
@@ -2375,27 +2498,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (Date.now() - self._last > CLIENT_DEAD_MS) { var c = self.conn; self.conn = null; try { c && c.close(); } catch (e) {} self._retry(); }
     }, 2000);
   };
-  Client.prototype._retry = function () {
+  Client.prototype._retry = function (delay) {
     var self = this; if (this.closed) return;
     if (this.state === 'online') { this._status('reconnecting'); this._since = Date.now(); }
-    if (this._since && Date.now() - this._since > GIVE_UP_MS) {
+    var limit = this._wasOnline ? REJOIN_MS : GIVE_UP_MS;
+    if (this._since && Date.now() - this._since > limit) {
       var f = this._first; this._first = null; this.close(true);
       if (f) f.reject({ type: 'timeout' }); else this.emit('closed', 'host-lost'); return;
     }
-    clearTimeout(this._rt); this._rt = setTimeout(function () { self._connect(); }, RETRY_MS);
+    var c = this.conn; this.conn = null;
+    try { if (c && c.close) c.close(); } catch (e) {}
+    clearTimeout(this._rt); this._rt = setTimeout(function () { self._connect(); }, delay == null ? RETRY_MS : delay);
   };
   Client.prototype.send = function (m) { var c = this.conn; try { if (c && c.open && this.state === 'online') { c.send(JSON.stringify(m)); return true; } } catch (e) {} return false; };
   /** Simulate a network drop (used by tests / when the app goes to background for long). */
   Client.prototype.drop = function () { var c = this.conn; this.conn = null; try { c && c.close(); } catch (e) {} if (this.state === 'online') this._retry(); };
   Client.prototype.close = function (silent) {
-    if (this.closed) return; this.closed = true; clearTimeout(this._rt); clearInterval(this._watch);
+    if (this.closed) return; this.closed = true; clearTimeout(this._rt); clearInterval(this._watch); unbindForeground(this);
     var c = this.conn, p = this.peer; this.conn = null;
     try { c && c.close(); } catch (e) {} setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 200);
     this._status('closed');
   };
 
   root.Net = { Host: Host, Client: Client, identity: identity, available: available, ice: ice, DEFAULT_ICE: DEFAULT_ICE,
+    NO_ROOM_TRIES: NO_ROOM_TRIES, MISS_MS: MISS_MS, MISS_OPEN_MS: MISS_OPEN_MS, HANDOFF_MS: HANDOFF_MS,
     shareBase: 'https://howenghong.github.io/macau-casino-apps/' };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.Net;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script id="mp-ui">
@@ -2430,15 +2558,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return M.normCode(m[1]);
   }
   var ERR = {
-    'no-room': '找不到此房間（房號錯誤或房主已離開）', full: '房間已滿（最多 7 人）', 'bad-token': '身份驗證失敗，請重新加入',
+    'no-room': '找不到此房間（請核對房號，並確認房主仍在房間）', full: '房間已滿（最多 7 人）', 'bad-token': '身份驗證失敗，請重新加入',
     timeout: '連線逾時，請檢查網絡後再試', 'host-left': '房主已離開房間', 'host-lost': '與房主失去連線', kicked: '你已被移出房間',
     network: '無法連接配對伺服器，請檢查網絡', 'server-error': '配對伺服器暫時無法使用，請稍後再試', 'socket-error': '無法連接配對伺服器，請檢查網絡',
-    'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號衝突，請再試一次',
+    'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號暫時被佔用，請再試一次',
     'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', rejected: '房主拒絕了你的加入申請', started: '牌局進行中，請稍候再加入'
   };
-  function errText(e) { var k = e && (e.type || e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
+  var HINT = {
+    'no-room': '房主請留在房間畫面。雙方不要同時切去其他程式。核對 6 位房號後可再試一次。',
+    timeout: '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    'host-lost': '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    'socket-closed': '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    network: '請檢查網絡是否已連接，稍候再試一次。',
+    'socket-error': '請檢查網絡是否已連接，稍候再試一次。',
+    'server-error': '配對伺服器暫時繁忙，請稍候再試一次。',
+    'unavailable-id': '上一任房主剛離開，房號尚未釋出。請稍候再試一次。'
+  };
+  function errKey(e) { return e && (e.type || e); }
+  function errText(e) { var k = errKey(e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
+  function errHint(e) { return HINT[errKey(e)] || ''; }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  root.MPUI = { getName: getName, setName: setName, shareUrl: shareUrl, qrSvg: qrSvg, copy: copy, share: share, hashCode: hashCode, errText: errText, esc: esc };
+  root.MPUI = { getName: getName, setName: setName, shareUrl: shareUrl, qrSvg: qrSvg, copy: copy, share: share, hashCode: hashCode, errText: errText, errHint: errHint, esc: esc };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script id="rooms-core">
@@ -2644,6 +2784,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       active: this.active, shoe: { rem: this.shoe.remaining(), total: this.shoe.total() },
       ready: Object.keys(this.ready).filter(function (k) { return self.ready[k]; }), canRebet: !!(this.lastBets[pid] && this.lastBets[pid].length), fx: this.fx.slice(-10) };
   };
+  BP.canHandoff = function () { return this.phase === 'bet' || this.phase === 'result'; };
+  /** Between hands only. Refunds the leaving host's open bets, then returns a plain snapshot (or null mid-hand). */
+  BP.exportForHandoff = function (hostPid) {
+    if (!this.canHandoff()) return null;
+    if (this.phase === 'result') this.newRound(Date.now());
+    if (hostPid) this.clearSeats(hostPid);
+    var shoe = this.shoe, pos = shoe.pos || 0, cards = [], i;
+    for (i = pos; i < shoe.cards.length && cards.length < 500; i++) cards.push(copyCard(shoe.cards[i]));
+    var players = [], self = this;
+    this.order.forEach(function (pid) { if (pid !== hostPid && self.players[pid]) players.push({ pid: pid, name: self.players[pid].name }); });
+    return { g: 'bj', round: this.round, decks: shoe.decks || 8, cutLeft: Math.max(0, (shoe.cut || 0) - pos), cards: cards,
+      seats: this.seats.map(function (s) { var keep = s.owner && s.owner !== hostPid; return { i: s.i, owner: keep ? s.owner : null, main: keep ? s.main : 0, pair: keep ? s.pair : 0 }; }),
+      lastBets: cleanLastBJ(this.lastBets, hostPid), players: players,
+      left: this.deadline ? Math.max(0, this.deadline - Date.now()) : 0 };
+  };
 
   // =====================================================================
   // 百家樂 (shared betting, largest bettor per side squeezes)
@@ -2771,6 +2926,99 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       res: done ? { w: this.res.winner, pt: this.res.pt, bt: this.res.bt, pp: this.res.pPair, bp: this.res.bPair } : null,
       results: done ? this.results : {}, history: this.history, shoe: { rem: this.shoe.remaining(), total: this.shoe.total() },
       ready: Object.keys(this.ready).filter(function (k) { return self.ready[k]; }), canRebet: !!this.lastBets[pid], fx: this.fx.slice(-10) };
+  };
+  AP.canHandoff = function () { return this.phase === 'bet' || this.phase === 'result'; };
+  AP.exportForHandoff = function (hostPid) {
+    if (!this.canHandoff()) return null;
+    if (this.phase === 'result') this.newRound(Date.now());
+    if (hostPid) this.refund(hostPid);
+    var shoe = this.shoe, pos = shoe.pos || 0, cards = [], i, bets = {}, last = {}, self = this;
+    for (i = pos; i < shoe.cards.length && cards.length < 500; i++) cards.push(copyCard(shoe.cards[i]));
+    Object.keys(this.bets).forEach(function (pid) { if (pid !== hostPid && sum(self.bets[pid])) bets[pid] = Object.assign(zero(), self.bets[pid]); });
+    Object.keys(this.lastBets).forEach(function (pid) { if (pid !== hostPid) last[pid] = Object.assign(zero(), self.lastBets[pid]); });
+    var players = [];
+    this.order.forEach(function (pid) { if (pid !== hostPid && self.players[pid]) players.push({ pid: pid, name: self.players[pid].name }); });
+    return { g: 'bac', round: this.round, mode: this.mode, squeeze: !!this.squeeze, decks: shoe.decks || 8,
+      cutLeft: Math.max(0, (shoe.cut || 0) - pos), cards: cards, bets: bets, lastBets: last, history: this.history.slice(-90), players: players,
+      left: this.deadline ? Math.max(0, this.deadline - Date.now()) : 0 };
+  };
+
+  var RANKS_OK = { A: 1, '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 1, '8': 1, '9': 1, '10': 1, J: 1, Q: 1, K: 1 };
+  var SUITS_OK = { '♠': 1, '♥': 1, '♦': 1, '♣': 1 };
+  function copyCard(c) { return { r: String(c.r), s: c.s, id: c.id }; }
+  function cardOk(c) { return !!(c && RANKS_OK[String(c.r)] && SUITS_OK[c.s] && (typeof c.id === 'number' || (typeof c.id === 'string' && c.id.length > 0 && c.id.length < 24))); }
+  function pidOk(id) { return typeof id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(id); }
+  function moneyOk(n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 100000 && n === Math.floor(n); }
+  function playerList(arr) {
+    var out = [], seen = {};
+    if (!Array.isArray(arr)) return null;
+    for (var i = 0; i < arr.length; i++) {
+      var p = arr[i]; if (!p || !pidOk(p.pid) || seen[p.pid]) return null;
+      seen[p.pid] = 1; out.push({ pid: p.pid, name: M.cleanName(p.name) });
+    }
+    return out;
+  }
+  function cleanLastBJ(raw, hostPid) {
+    var out = {}; if (!raw) return out;
+    Object.keys(raw).forEach(function (pid) {
+      if (pid === hostPid || !Array.isArray(raw[pid])) return;
+      out[pid] = raw[pid].map(function (x) { return { i: x.i, main: x.main, pair: x.pair }; });
+    });
+    return out;
+  }
+  function shoeFrom(CoreShoe, decks, cards, cutLeft) {
+    var shoe = new CoreShoe(decks || 8, function () { return 0; });
+    shoe.cards = cards.map(copyCard); shoe.pos = 0; shoe.decks = decks || 8; shoe.cut = cutLeft;
+    return shoe;
+  }
+  BJRoom.restore = function (bank, core, snap, mePid) {
+    if (!snap || snap.g !== 'bj' || !core || !Array.isArray(snap.cards) || snap.cards.length > 500 || !Array.isArray(snap.seats) || snap.seats.length !== 7) return null;
+    var i, players = playerList(snap.players); if (!players) return null;
+    var known = {}; players.forEach(function (p) { known[p.pid] = 1; });
+    for (i = 0; i < snap.cards.length; i++) if (!cardOk(snap.cards[i])) return null;
+    var cut = snap.cutLeft; if (typeof cut !== 'number' || cut < 0 || cut > snap.cards.length) return null;
+    for (i = 0; i < 7; i++) {
+      var s = snap.seats[i]; if (!s || s.i !== i) return null;
+      if (s.owner && !known[s.owner]) return null;
+      if (!moneyOk(s.main || 0) || !moneyOk(s.pair || 0)) return null;
+      if ((s.pair || 0) > 0 && !(s.main > 0)) return null;
+    }
+    var shoe = shoeFrom(core.Shoe, snap.decks, snap.cards, cut);
+    var e = new BJRoom({ bank: bank, core: core, shoe: shoe });
+    e.round = snap.round > 0 && snap.round < 1000000 ? Math.floor(snap.round) : 1;
+    players.forEach(function (p) { e.addPlayer(p.pid, p.name); if (p.pid !== mePid) e.setOnline(p.pid, false); });
+    snap.seats.forEach(function (s) { if (!s.owner) return; var t = e.seats[s.i]; t.owner = s.owner; t.main = s.main || 0; t.pair = s.pair || 0; });
+    e.lastBets = {};
+    if (snap.lastBets && typeof snap.lastBets === 'object') Object.keys(snap.lastBets).forEach(function (pid) { if (known[pid]) e.lastBets[pid] = snap.lastBets[pid]; });
+    if (snap.left > 0 && snap.left < 60000 && e.bettors().length) e.deadline = Date.now() + snap.left;
+    e.phase = 'bet'; return e;
+  };
+  BacRoom.restore = function (bank, core, snap, mePid) {
+    if (!snap || snap.g !== 'bac' || !core || !Array.isArray(snap.cards) || snap.cards.length > 500) return null;
+    var i, players = playerList(snap.players); if (!players) return null;
+    var known = {}; players.forEach(function (p) { known[p.pid] = 1; });
+    for (i = 0; i < snap.cards.length; i++) if (!cardOk(snap.cards[i])) return null;
+    var cut = snap.cutLeft; if (typeof cut !== 'number' || cut < 0 || cut > snap.cards.length) return null;
+    var bets = snap.bets || {};
+    Object.keys(bets).forEach(function (pid) { if (!known[pid]) return null; });
+    for (var pid in bets) {
+      if (!known[pid]) return null;
+      var b = bets[pid]; if (!b) return null;
+      for (i = 0; i < KEYS.length; i++) if (!moneyOk(b[KEYS[i]] || 0)) return null;
+    }
+    var shoe = shoeFrom(core.Shoe, snap.decks, snap.cards, cut); shoe.burned = { restored: true };
+    var e = new BacRoom({ bank: bank, core: core, shoe: shoe, mode: snap.mode, squeeze: snap.squeeze !== false });
+    e.round = snap.round > 0 && snap.round < 1000000 ? Math.floor(snap.round) : 1;
+    players.forEach(function (p) { e.addPlayer(p.pid, p.name); if (p.pid !== mePid) e.setOnline(p.pid, false); });
+    Object.keys(bets).forEach(function (p) { e.bets[p] = Object.assign(zero(), bets[p]); });
+    e.history = [];
+    (Array.isArray(snap.history) ? snap.history : []).slice(-90).forEach(function (h) {
+      if (h && (h.w === 'B' || h.w === 'P' || h.w === 'T')) e.history.push({ w: h.w, bp: !!h.bp, pp: !!h.pp, pt: +h.pt || 0, bt: +h.bt || 0 });
+    });
+    e.lastBets = {};
+    if (snap.lastBets && typeof snap.lastBets === 'object') Object.keys(snap.lastBets).forEach(function (p) { if (known[p]) e.lastBets[p] = Object.assign(zero(), snap.lastBets[p]); });
+    if (snap.left > 0 && snap.left < 60000 && e.bettors().length) e.deadline = Date.now() + snap.left;
+    e.phase = 'bet'; return e;
   };
 
   var api = { BJRoom: BJRoom, BacRoom: BacRoom, sum: sum, KEYS: KEYS };
@@ -3140,6 +3388,55 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (me >= 0 && this.seats[me].hole.length && this.board.length >= 3 && this.seats[me].inHand) v.myHand = evaluate(this.seats[me].hole.concat(this.board)).name;
     return v;
   };
+  /** Between hands only. Cashes the leaving host out to their bank, then returns stacks for everyone else. */
+  H.canHandoff = function () { return this.phase === 'wait' || this.phase === 'result' || this.phase === 'between'; };
+  H.exportForHandoff = function (hostPid) {
+    if (!this.canHandoff()) return null;
+    var hi = hostPid ? this.seatOf(hostPid) : -1;
+    if (hi >= 0) this.cashOut(hi);
+    var seats = [], players = [], pid;
+    for (var i = 0; i < this.max; i++) {
+      var s = this.seats[i];
+      if (!s) { seats.push(null); continue; }
+      if (s.bot && s.stack < this.bb) s.stack = this.bb * 100;
+      seats.push({ pid: s.bot ? '' : s.pid, name: s.name, stack: s.stack, sitOut: !!s.sitOut, bot: s.bot ? { level: s.bot.level, style: s.bot.style } : null });
+    }
+    for (pid in this.players) if (Object.prototype.hasOwnProperty.call(this.players, pid) && pid !== hostPid) players.push({ pid: pid, name: this.players[pid].name });
+    return { g: 'holdem', sb: this.sb, bb: this.bb, max: this.max, button: this.button, handNo: this.handNo, seats: seats, players: players };
+  };
+  Holdem.restore = function (bank, snap, mePid) {
+    if (!snap || snap.g !== 'holdem' || !Array.isArray(snap.seats)) return null;
+    var sb = snap.sb, bb = snap.bb, max = snap.seats.length;
+    if (!(sb > 0) || !(bb >= sb) || max < 2 || max > 9 || snap.max !== max) return null;
+    var e = new Holdem({ bank: bank, sb: sb, bb: bb, seats: max }), seen = {}, i;
+    var list = Array.isArray(snap.players) ? snap.players : [];
+    for (i = 0; i < list.length; i++) {
+      var p = list[i];
+      if (!p || typeof p.pid !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(p.pid) || seen[p.pid]) return null;
+      seen[p.pid] = 1; e.addPlayer(p.pid, p.name); if (p.pid !== mePid) e.setOnline(p.pid, false);
+    }
+    var botN = 0;
+    for (i = 0; i < max; i++) {
+      var s = snap.seats[i];
+      if (!s) continue;
+      if (typeof s.stack !== 'number' || !isFinite(s.stack) || s.stack < 0 || s.stack > 1e9 || s.stack !== Math.floor(s.stack)) return null;
+      if (s.bot) {
+        botN++;
+        var lv = LEVELS[s.bot.level] ? s.bot.level : 'normal', st = STYLES[s.bot.style] ? s.bot.style : Object.keys(STYLES)[0];
+        e.botSeq = botN;
+        e.seats[i] = e.mkSeat('bot' + botN, String(s.name || ('電腦' + botN)).slice(0, 12), s.stack, { level: lv, style: st });
+      } else {
+        if (!seen[s.pid]) return null;
+        e.seats[i] = e.mkSeat(s.pid, e.players[s.pid].name, s.stack, null);
+        if (s.pid !== mePid) e.seats[i].off = true;
+      }
+      e.seats[i].sitOut = !!s.sitOut;
+    }
+    e.button = typeof snap.button === 'number' ? snap.button : -1;
+    e.handNo = snap.handNo > 0 ? Math.floor(snap.handNo) : 0;
+    e.phase = 'wait'; e.rev++;
+    return e;
+  };
 
   var api = { SUITS: SUITS, RANKS: RANKS, RV: RV, CAT: CAT, CAT3: CAT3, card: card, parse: parse, parseList: parseList, deck: deck, shuffle: shuffle, Deck: Deck,
     evaluate: evaluate, evaluate3: evaluate3, cardText: cardText, equity: equity, decide: decide, STYLES: STYLES, LEVELS: LEVELS, BLINDS: BLINDS, Holdem: Holdem };
@@ -3355,8 +3652,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (game === 'holdem') { for (var b = 0; b < (o.bots || 0); b++) S.engine.addBot(b + 1, o.level || 'normal', o.style && o.style !== 'mix' ? o.style : null); }
     if (local) { enter(); hostLoop(); return Promise.resolve(); }
     var h = S.net = new Net.Host('casino', PREFIX, { onHello: function (m) { return ledger.join(m); } }), s = S;
+    bindHost(s, h);
+    return h.start().then(function (code) { if (S !== s) { h.close(); return; } s.code = code; s.status = 'online'; enter(); hostLoop(); share(true); });
+  }
+  function bindHost(s, h) {
+    var game = s.game, ledger = s.ledger;
     h.on('join', function (pid, m, rejoin) {
-      if (S !== s) return; var p = ledger.get(pid);
+      if (S !== s) return; var p = ledger.get(pid); if (!p) return;
       if (p.status === 'pending') { h.send(pid, { t: 'pending', amt: p.req, host: s.name, game: game }); if (!rejoin) { toast(p.name + ' 申請加入（' + fmt(p.req) + '）'); sfx('chip'); openSide(); } s.dirty = true; renderSideIfOpen(); return; }
       s.engine.addPlayer(pid, p.name); s.engine.setOnline(pid, true);
       h.send(pid, { t: 'welcome', game: game, code: s.code, host: s.name, you: pid });
@@ -3369,7 +3671,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     h.on('drop', function (pid) { if (S !== s) return; if (ledger.get(pid) && ledger.get(pid).status !== 'ok') { s.dirty = true; renderSideIfOpen(); return; } s.engine.setOnline(pid, false); var p = ledger.get(pid); if (p) toast(p.name + ' 已離線'); s.dirty = true; });
     h.on('error', function () {});
-    return h.start().then(function (code) { if (S !== s) { h.close(); return; } s.code = code; s.status = 'online'; enter(); hostLoop(); share(true); });
   }
   function playersList() {
     var s = S, list = [{ pid: s.me, name: s.name, bal: myBal(), net: s.acct ? s.acct.bal - s.acct.issued : 0, on: true, host: true }];
@@ -3401,15 +3702,76 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       else if (m.t === 'chat') chatIn(String(m.pid || ''), M.cleanName(m.name), m.k);
       else if (m.t === 'err') { toast(String(m.msg).slice(0, 40)); sfx('click'); }
       else if (m.t === 'chips' && isFinite(+m.d)) { toast('房主' + (+m.d > 0 ? '為你補碼 ' : '扣減了你的籌碼 ') + fmt(Math.abs(+m.d))); sfx('chip'); }
-      else if (m.t === 'welcome' && s.game && s.entered) toast('已重新連線');
+      else if (m.t === 'welcome' && s.game && s.entered) { s._migrating = false; toast('已重新連線'); }
     });
-    c.on('status', function (st) { if (S !== s) return; s.status = st; top(); if (st === 'reconnecting') toast('連線中斷，正在重新連線…'); });
+    c.on('status', function (st) { if (S !== s) return; s.status = st; top(); if (st === 'reconnecting') toast(s._migrating ? '房主交接中，正在重新連線…' : '連線中斷，正在重新連線…'); });
+    c.on('migrate', function () { if (S === s) s._migrating = true; });
+    c.on('claim', function (payload) { if (S !== s) return; var st = payload && payload.state; if (!acceptHandoff(s, st)) endSession('房主已離開，交接未能完成'); else becomeHost(s, st); });
     c.on('closed', function (why) { if (S !== s) return; endSession(U.errText(why)); });
     return c.start().then(function (w) {
       if (S !== s) return; if (!GNAME[w.game]) { c.close(); throw { type: 'bad-game' }; }
       s.game = w.game; s.hostName = M.cleanName(w.host); s.status = 'online'; enter();
       try { sessionStorage.setItem('mcasino.room', code); } catch (e) {}
     }, function (e) { if (S === s) S = null; throw e; });
+  }
+  function moneyOk(n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 1e9; }
+  function acceptHandoff(s, st) {
+    return !!(st && st.v === 1 && st.code === s.code && st.game === s.game && st.you && st.you.pid === s.me && moneyOk(st.you.bal) && moneyOk(st.you.issued) && st.ledger && st.engine);
+  }
+  function restoreEngine(st, bank) {
+    var eng = st.engine;
+    if (st.game === 'bj') return R.BJRoom.restore(bank, C, eng, st.you.pid);
+    if (st.game === 'bac') return R.BacRoom.restore(bank, K, eng, st.you.pid);
+    if (st.game === 'holdem') return PK.Holdem.restore(bank, eng, st.you.pid);
+    return null;
+  }
+  function becomeHost(s, st) {
+    var rows = (st.ledger.players || []).filter(function (p) { return p.pid !== s.me; });
+    var ledger = M.Ledger.restore({ max: st.ledger.max, start: st.ledger.start, approve: st.ledger.approve, players: rows });
+    var acct = { bal: st.you.bal, issued: st.you.issued };
+    var engine = ledger && restoreEngine(st, myBank(ledger, s.me, acct));
+    if (!ledger || !engine) { endSession('房主已離開，交接未能完成'); return; }
+    clearInterval(s.loop);
+    s.role = 'host'; s.acct = acct; s.ledger = ledger; s.engine = engine; s.room = null; s.opts = st.opts || s.opts || {}; s.status = 'connecting';
+    var h = s.net = new Net.Host('casino', PREFIX, { onHello: function (m) { return s.ledger.join(m); } });
+    bindHost(s, h);
+    toast('房主已離開，正在接手房間…'); top(); saveAcct();
+    h.claim(st.code).then(function (code) {
+      if (S !== s) { h.close(); return; }
+      s.code = code; s.status = 'online'; if (!s.loop) hostLoop(); toast('你已成為房主，房號不變'); top();
+    }, function (e) { if (S !== s) return; endSession(U.errText(e)); });
+  }
+  function handoffCandidates() {
+    if (!S || S.role !== 'host' || !S.net) return [];
+    return S.ledger.active().filter(function (p) { return S.net.online(p.pid); });
+  }
+  function buildHandoff(toPid) {
+    var s = S, guest = s.ledger.get(toPid);
+    if (!guest || guest.status !== 'ok' || !s.engine.exportForHandoff) return null;
+    var eng = s.engine.exportForHandoff(s.me); if (!eng) return null;
+    var rows = [];
+    s.ledger.list().forEach(function (p) { if (p.pid !== toPid && p.status === 'ok') rows.push({ pid: p.pid, tok: p.tok, name: p.name, bal: p.bal, issued: p.issued, status: 'ok', req: p.req }); });
+    return { v: 1, game: s.game, code: s.code,
+      opts: { start: s.ledger.opts.start || 0, approve: !!s.ledger.opts.approve, mode: s.opts.mode, squeeze: s.opts.squeeze, blinds: s.opts.blinds, level: s.opts.level, style: s.opts.style, seats: s.opts.seats },
+      you: { pid: guest.pid, name: guest.name, bal: guest.bal, issued: guest.issued },
+      ledger: { max: s.ledger.max, start: s.ledger.opts.start || 0, approve: !!s.ledger.opts.approve, players: rows }, engine: eng };
+  }
+  function doHandoff(pid) {
+    var s = S; if (!s || s.role !== 'host' || !s.net || !s.net.online(pid)) return false;
+    var who = (s.ledger.get(pid) || {}).name || '其他玩家';
+    var snap = buildHandoff(pid); if (!snap) return false;
+    var net = s.net; s.net = null; net.transfer(pid, snap);
+    endSession('房間已交給 ' + who + '，房號不變');
+    return true;
+  }
+  function pickHandoff(s) {
+    var cands = handoffCandidates();
+    if (!cands.length || !s.engine.canHandoff || !s.engine.canHandoff()) { toast('現在未能交接，請先完成本局'); return; }
+    var go = function (pid) { if (S !== s) return; if (!doHandoff(pid)) toast('現在未能交接，請先完成本局'); };
+    if (cands.length === 1) { go(cands[0].pid); return; }
+    dialog('交給誰繼續？', '<p>房號保持不變。你會結算並離開，其餘玩家留在原房。</p><div class="mp-seg" id="hoWho">' + cands.map(function (p) { return '<button data-v="' + esc(p.pid) + '">' + esc(p.name) + '</button>'; }).join('') + '</div>',
+      [{ t: '取消', v: false }, { t: '確定', cls: 'ok', v: function (d) { var b = d.querySelector('#hoWho .on'); return b ? b.dataset.v : false; } }], segs)
+      .then(function (pid) { if (pid) go(pid); });
   }
   function send(m) {
     if (!S) return;
@@ -3426,12 +3788,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return t;
   }
   function endSession(reason) {
-    var s = S; if (!s) return; S = null;
+    var s = S; if (!s) return;
+    // unsettled() reads the live session, so measure it before the session is cleared.
+    var extra = 0;
+    if (s.role === 'client') { if (s.room) extra = unsettled(s.view); }
+    else extra = unsettled(s.engine.view(s.me, Date.now()));
+    S = null;
     clearInterval(s.loop); try { sessionStorage.removeItem('mcasino.room'); } catch (e) {}
     var net = null;
-    if (s.role === 'local') { var v = s.engine.view(s.me, Date.now()), rr = unsettled(v); if (rr > 0) Wallet.save(Wallet.load() + rr); }
-    else if (s.role === 'client') { if (s.room) net = settleNet(s.room.bal + unsettled(s.view), s.room.issued); if (s.net) s.net.close(true); }
-    else { var hv = s.engine.view(s.me, Date.now()); net = settleNet(s.acct.bal + unsettled(hv), s.acct.issued); if (s.net) s.net.close(); }
+    if (s.role === 'local') { if (extra > 0) Wallet.save(Wallet.load() + extra); }
+    else if (s.role === 'client') { if (s.room) net = settleNet(s.room.bal + extra, s.room.issued); if (s.net) s.net.close(true); }
+    else { net = settleNet(s.acct.bal + extra, s.acct.issued); if (s.net) s.net.close(); }
     s.settled = net;
     UI.seen = {}; UI.hidden = {}; UI.ctrlKey = '';
     window.Casino.forceLobby();
@@ -3444,10 +3811,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var s = S, v = s.view;
     var inPlay = v && ((v.g === 'bj' && v.phase !== 'bet' && v.phase !== 'result' && v.seats.some(function (x) { return x.owner === s.me && x.hands.length; })) ||
       (v.g === 'bac' && v.phase !== 'bet' && v.phase !== 'result' && R.sum(v.mine) > 0) || (v.g === 'holdem' && v.me >= 0 && v.seats[v.me] && v.seats[v.me].inHand && !v.seats[v.me].folded && v.phase !== 'result'));
-    var title = s.role === 'client' ? '離開房間？' : s.role === 'host' ? '解散房間？' : '離開牌桌？';
-    var txt = inPlay ? (v.g === 'holdem' ? '你正在牌局中，離開會自動棄牌；檯面籌碼會兌換回餘額。' : '牌局進行中，離開會失去本局注碼。') : s.role === 'host' ? '所有玩家會返回各自的單機遊戲。' : (v && v.g === 'holdem' ? '檯面籌碼會兌換回你的餘額。' : '');
-    dialog(title, '<p>' + esc(txt) + '</p>', [{ t: '取消', v: false }, { t: '離開', cls: 'ok', v: true }]).then(function (ok) {
+    var canHand = s.role === 'host' && handoffCandidates().length && s.engine && s.engine.canHandoff && s.engine.canHandoff();
+    var midHand = s.role === 'host' && handoffCandidates().length && !canHand;
+    var title = s.role === 'client' ? '離開房間？' : s.role === 'host' ? (canHand ? '離開房間？' : '解散房間？') : '離開牌桌？';
+    var txt = canHand ? '可以把房間交給在線玩家，房號不變。你會結算離開，其餘玩家留在原房。' : midHand ? '牌局進行中，現在離開會解散房間。請先完成本局，再交給其他玩家。' : inPlay ? (v.g === 'holdem' ? '你正在牌局中，離開會自動棄牌；檯面籌碼會兌換回餘額。' : '牌局進行中，離開會失去本局注碼。') : s.role === 'host' ? '所有玩家會返回各自的單機遊戲。' : (v && v.g === 'holdem' ? '檯面籌碼會兌換回你的餘額。' : '');
+    var buttons = [{ t: '取消', v: false }];
+    if (canHand) buttons.push({ t: '交給其他玩家', v: 'hand' });
+    buttons.push({ t: s.role === 'host' ? '解散' : '離開', cls: 'ok', v: 'leave' });
+    dialog(title, '<p>' + esc(txt) + '</p>', buttons).then(function (ok) {
       if (!ok || S !== s) return;
+      if (ok === 'hand') { pickHandoff(s); return; }
       if (v && v.g === 'holdem' && v.me >= 0) send({ t: 'stand' });
       else if (v && v.phase === 'bet') send({ t: 'clearAll' });
       if (s.role === 'client') {
@@ -3458,7 +3831,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       endSession('');
     });
   }
-  window.addEventListener('pagehide', function () { if (S && S.role === 'host') try { S.net.close(); } catch (e) {} });
+  // Do not tear the room down on pagehide. On phones that event also fires when the host
+  // switches to another app to send the room code, which used to destroy the peer before friends could join.
 
   // ------------------------------------------------------------------ chat & players
   function chatIn(pid, name, k) {
@@ -3760,23 +4134,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var box = document.createElement('div'); box.className = 'lb-mp'; box.id = 'lbMP';
     box.innerHTML = '<div class="lb-sec">朋友同枱 · 聯機</div><div class="lb-mprow"><label>暱稱</label><input id="lbName" maxlength="12" placeholder="你的名稱" value="' + esc(U.getName()) + '"></div>' +
       '<div class="lb-mprow"><button class="tbtn" id="lbHostBJ">開房 21點</button><button class="tbtn" id="lbHostBAC">開房 百家樂</button><button class="tbtn" id="lbHostPK">開房 德州撲克</button></div>' +
-      '<div class="lb-mprow"><label>申請籌碼</label><select id="lbReq">' + STARTS.map(function (v) { return '<option value="' + v + '">' + fmt(v) + '</option>'; }).join('') + '</select></div><div class="lb-mprow"><input id="lbCode" maxlength="7" placeholder="輸入 6 位房號" autocomplete="off" spellcheck="false"><button class="tbtn go" id="lbJoin">加入</button></div><div class="lb-mpnote">點對點聯機（WebRTC）· 最多 7 人 · 房間籌碼由房主發出，離開時只結算淨輸贏</div>';
+      '<div class="lb-mprow"><label>申請籌碼</label><select id="lbReq">' + STARTS.map(function (v) { return '<option value="' + v + '">' + fmt(v) + '</option>'; }).join('') + '</select></div><div class="lb-mprow"><input id="lbCode" maxlength="7" placeholder="輸入 6 位房號" autocomplete="off" spellcheck="false"><button class="tbtn go" id="lbJoin">加入</button></div><div class="lb-mpnote">點對點聯機（WebRTC，流動網絡連不上時自動中繼）· 最多 7 人 · 房間籌碼由房主發出，離開時只結算淨輸贏</div>';
     return box;
   }
   function saveName() { var i = $('lbName'); if (i) U.setName(i.value); }
-  function wait(txt, p) {
-    dialog('聯機', '<p class="mp-wait2">' + esc(txt) + '</p>', [{ t: '取消', v: 'cancel' }]).then(function (r) { if (r === 'cancel' && S && !S.entered) { var s = S; S = null; try { s.net && s.net.close(true); } catch (e) {} } });
-    return p.then(function () { closeDialog(); }, function (e) { closeDialog(); S = null; dialog('未能連線', '<p>' + esc(U.errText(e)) + '</p>', [{ t: '知道了', cls: 'ok', v: true }]); });
+  function wait(txt, p, again) {
+    var cancelled = false;
+    dialog('聯機', '<p class="mp-wait2">' + esc(txt) + '</p>', [{ t: '取消', v: 'cancel' }]).then(function (r) { if (r === 'cancel' && S && !S.entered) { cancelled = true; var s = S; S = null; try { s.net && s.net.close(true); } catch (e) {} } });
+    return p.then(function () { closeDialog(); }, function (e) {
+      if (cancelled) return;
+      closeDialog(); if (S && !S.entered) { try { S.net && S.net.close(true); } catch (x) {} S = null; }
+      var hint = U.errHint(e), buttons = [{ t: '知道了', v: false }];
+      if (again) buttons.unshift({ t: '再試一次', cls: 'ok', v: 'retry' });
+      dialog('未能連線', '<p>' + esc(U.errText(e)) + '</p>' + (hint ? '<p class="mp-note">' + esc(hint) + '</p>' : ''), buttons).then(function (r) { if (r === 'retry' && again) again(); });
+    });
   }
   function reqAmount() { var v = 20000; try { v = +($('lbReq') ? $('lbReq').value : localStorage.getItem('mp.req')) || 20000; } catch (e) {} return M.chipAmt(v) ? v : 20000; }
   function hostRoom(game) {
     saveName(); if (!Net.available()) { dialog('未能聯機', '<p>' + U.errText('browser-incompatible') + '</p>'); return; }
     if (game === 'holdem') return holdemSetup(true);
-    dialog('開房 · ' + GNAME[game], roomFields(), [{ t: '取消', v: false }, { t: '開房', cls: 'ok', v: function (d) { return readRoomFields(d, { mode: 'comm', squeeze: true }); } }], segs).then(function (o) { if (o) wait('正在開房…', startHost(game, o)); });
+    dialog('開房 · ' + GNAME[game], roomFields(), [{ t: '取消', v: false }, { t: '開房', cls: 'ok', v: function (d) { return readRoomFields(d, { mode: 'comm', squeeze: true }); } }], segs).then(function (o) { if (o) openHost(game, o); });
   }
+  function openHost(game, o) { wait('正在開房…', startHost(game, o), function () { openHost(game, o); }); }
   function joinRoom(code) {
     saveName(); code = M.normCode(code); if (!code) { dialog('房號錯誤', '<p>房號應為 6 位英文字母／數字。</p>'); return; }
-    wait('正在加入房間 ' + code + '…', join(code));
+    wait('正在加入房間 ' + code + '…', join(code), function () { joinRoom(code); });
   }
   function holdemSetup(online) {
     var lv = PK.BLINDS.map(function (b, i) { return '<button data-v="' + i + '"' + (i === 1 ? ' class="on"' : '') + '>' + b.sb + '/' + b.bb + '</button>'; }).join('');
@@ -3791,7 +4173,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       .then(function (o) {
         if (!o) return;
         if (!online) { var lvB = PK.BLINDS[o.blinds]; if (Wallet.load() < lvB.bb * 40) { dialog('餘額不足', '<p>此盲注最少買入 ' + fmt(lvB.bb * 40) + '。</p>'); return; } o.seats = Math.max(2, o.bots + 1); startHost('holdem', o, true); setTimeout(function () { if (S && S.view) buyIn(S.view, 0); }, 400); return; }
-        wait('正在開房…', startHost('holdem', o));
+        openHost('holdem', o);
       });
   }
   function installLobby() {
@@ -3828,7 +4210,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var hc = window.__joinHash ? M.normCode((/join=([A-Za-z0-9-]{6,8})/.exec(window.__joinHash) || [])[1]) : null; window.__joinHash = null; if (hc) { $('lbCode').value = hc; if (U.getName()) joinRoom(hc); else { $('lbName').focus(); dialog('加入房間 ' + hc, '<p>請先輸入暱稱，然後撳「加入」。</p>'); } return; }
     var rc = null; try { rc = sessionStorage.getItem('mcasino.room'); } catch (e) {} rc = rc && M.normCode(rc);
     var rec = readAcct();
-    if (rc && rec && rec.role === 'client' && rec.code === rc) { wait('正在重新加入房間 ' + rc + '…', join(rc).catch(function (e) { setTimeout(settleLeftover, 50); throw e; })); return; }
+    if (rc && rec && rec.role === 'client' && rec.code === rc) { wait('正在重新加入房間 ' + rc + '…', join(rc).catch(function (e) { setTimeout(settleLeftover, 50); throw e; }), function () { joinRoom(rc); }); return; }
     if (rec) settleLeftover();
     if (rc) joinRoom(rc);
   }, 50);

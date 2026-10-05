@@ -888,6 +888,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   Ledger.prototype.remove = function (pid) { if (!this.p[pid]) return false; delete this.p[pid]; this.order = this.order.filter(function (x) { return x !== pid; }); return true; };
   Ledger.prototype.debit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0) || p.bal < x) return false; p.bal -= x; return true; };
   Ledger.prototype.credit = function (pid, x) { var p = this.p[pid]; if (!p || p.status !== 'ok' || !(x >= 0)) return false; p.bal += x; return true; };
+  /** Plain snapshot for a voluntary host handoff. Includes the secret tok so the new host can recognise the same device. */
+  Ledger.prototype.export = function () {
+    var o = this.opts || {};
+    return { max: this.max, start: o.start || 0, approve: !!o.approve, players: this.list().map(function (p) {
+      return { pid: p.pid, tok: p.tok, name: p.name, bal: p.bal, issued: p.issued, status: p.status, req: p.req || 0 };
+    }) };
+  };
+  /** Rebuild a ledger from a host snapshot. Returns null if anything is the wrong shape (never invents chips). */
+  Ledger.restore = function (d) {
+    if (!d || !Array.isArray(d.players) || d.players.length > MAX_PLAYERS - 1) return null;
+    var start = d.start == null ? 0 : d.start;
+    if (start !== 0 && !chipAmt(start)) return null;
+    var L = new Ledger({ max: MAX_PLAYERS - 1, start: start, approve: !!d.approve }), seen = {};
+    for (var i = 0; i < d.players.length; i++) {
+      var p = d.players[i];
+      if (!p || typeof p.pid !== 'string' || !/^[0-9a-f]{16}$/.test(p.pid) || typeof p.tok !== 'string' || !/^[0-9a-f]{32}$/.test(p.tok)) return null;
+      if (seen[p.pid] || (p.status !== 'ok' && p.status !== 'pending')) return null;
+      if (typeof p.bal !== 'number' || typeof p.issued !== 'number' || !isFinite(p.bal) || !isFinite(p.issued)) return null;
+      if (p.bal < 0 || p.issued < 0 || p.bal > CHIP_MAX * 20 || p.issued > CHIP_MAX * 20) return null;
+      seen[p.pid] = 1;
+      L.p[p.pid] = { pid: p.pid, tok: p.tok, name: cleanName(p.name), bal: p.bal, issued: p.issued, req: chipAmt(p.req) ? p.req : start, status: p.status, conn: false, ready: false, last: null };
+      L.order.push(p.pid);
+    }
+    return L;
+  };
 
   // ---- 21點 seat rules (host validates every client bet) ----
   var BJ = { maxSeats: 3, numSeats: 7, minBet: 100, maxBet: 20000, sideMax: 1000 };
@@ -951,9 +976,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 (function (root) {
   'use strict';
   var M = root.MPCore;
-  var DEFAULT_ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }];
+  // STUN finds a public address; the PeerJS public TURN relays carry the data channel when both
+  // sides are behind symmetric NAT (typical on mobile). Passing iceServers replaces PeerJS defaults,
+  // so these relays have to be listed here or phones often never connect. Credentials are the public
+  // ones shipped with PeerJS, not a private key.
+  var DEFAULT_ICE = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    { urls: ['turn:eu-0.turn.peerjs.com:3478?transport=udp', 'turn:us-0.turn.peerjs.com:3478?transport=udp', 'turn:eu-0.turn.peerjs.com:3478?transport=tcp', 'turn:us-0.turn.peerjs.com:3478?transport=tcp'], username: 'peerjs', credential: 'peerjsp' }
+  ];
   function ice() { return root.NET_ICE || DEFAULT_ICE; }
-  function peerOpts() { var o = { debug: 0, config: { iceServers: ice() } }; if (root.NET_PEER_SERVER) for (var k in root.NET_PEER_SERVER) o[k] = root.NET_PEER_SERVER[k]; return o; }
+  function peerOpts() {
+    var o = { debug: 0, config: { iceServers: ice(), sdpSemantics: 'unified-plan' } };
+    if (root.NET_PEER_SERVER) for (var k in root.NET_PEER_SERVER) o[k] = root.NET_PEER_SERVER[k];
+    return o;
+  }
+  function bindForeground(self, fn) {
+    unbindForeground(self);
+    if (typeof document === 'undefined' || !document.addEventListener) return;
+    self._vis = function () { if (!document.hidden && !self.closed) fn(); };
+    self._show = function (e) { if ((!e || e.persisted) && !self.closed) fn(); };
+    document.addEventListener('visibilitychange', self._vis);
+    if (typeof window !== 'undefined') window.addEventListener('pageshow', self._show);
+  }
+  function unbindForeground(self) {
+    if (typeof document !== 'undefined' && self._vis) document.removeEventListener('visibilitychange', self._vis);
+    if (typeof window !== 'undefined' && self._show) window.removeEventListener('pageshow', self._show);
+  }
   function Emitter() { this._h = {}; }
   Emitter.prototype.on = function (e, f) { (this._h[e] = this._h[e] || []).push(f); return this; };
   Emitter.prototype.emit = function (e) { var a = [].slice.call(arguments, 1); (this._h[e] || []).slice().forEach(function (f) { try { f.apply(null, a); } catch (x) { setTimeout(function () { throw x; }); } }); };
@@ -965,7 +1013,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!v || !/^[0-9a-f]{16}$/.test(v.pid) || !/^[0-9a-f]{32}$/.test(v.tok)) { v = { pid: M.makeId(2), tok: M.makeId(4) }; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
     return v;
   }
-  var PING_MS = 4000, HOST_DEAD_MS = 14000, CLIENT_DEAD_MS = 13000, RETRY_MS = 2500, GIVE_UP_MS = 60000;
+  var PING_MS = 4000, HOST_DEAD_MS = 14000, CLIENT_DEAD_MS = 13000, RETRY_MS = 2500, GIVE_UP_MS = 50000, REJOIN_MS = 180000;
+  var OPEN_MS = 20000, NO_ROOM_TRIES = 2, MISS_MS = 500, MISS_OPEN_MS = 1800;
+  var HANDOFF_MS = 700, CLAIM_TRIES = 12, CLAIM_GAP = 400, CLAIM_OPEN_MS = 3000;
 
   // ---------------- Host ----------------
   function Host(app, prefix, opts) {
@@ -981,6 +1031,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         p.on('error', function (e) {
           if (!settled) { settled = true; try { p.destroy(); } catch (x) {} if (e.type === 'unavailable-id' && ++tries < 5) return attempt(); return reject(e); }
           self.emit('error', e);
+          if (!self.closed && e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed')) {
+            setTimeout(function () { if (!self.closed && !p.destroyed && p.disconnected) try { p.reconnect(); } catch (x) {} }, 1500);
+          }
         });
       }
       attempt();
@@ -990,6 +1043,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var self = this, p = this.peer;
     p.on('disconnected', function () { if (!self.closed) setTimeout(function () { if (!self.closed && p.disconnected && !p.destroyed) p.reconnect(); }, 1500); });
     p.on('connection', function (c) { self._accept(c); });
+    bindForeground(this, function () { if (!p.destroyed && p.disconnected) try { p.reconnect(); } catch (e) {} });
     this._tick = setInterval(function () {
       var now = Date.now();
       Object.keys(self.conns).forEach(function (pid) {
@@ -1033,9 +1087,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   Host.prototype.kick = function (pid, reason) { var e = this.conns[pid]; if (e) { this._raw(e.c, { t: 'bye', reason: reason || 'kicked' }); var self = this; setTimeout(function () { self._drop(pid, 'kicked'); }, 200); } };
   Host.prototype.online = function (pid) { return !!this.conns[pid]; };
   Host.prototype.close = function () {
-    if (this.closed) return; this.closed = true; clearInterval(this._tick);
+    if (this.closed) return; this.closed = true; clearInterval(this._tick); unbindForeground(this);
     this.broadcast({ t: 'bye', reason: 'host-left' });
     var p = this.peer; setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 300);
+  };
+  /** Take over an existing room code once the previous host has released that peer id. */
+  Host.prototype.claim = function (code) {
+    var self = this, tries = 0;
+    this.code = code;
+    return new Promise(function (resolve, reject) {
+      function attempt() {
+        if (self.closed) return reject({ type: 'closed' });
+        var p = new root.Peer(self.prefix + code, peerOpts()), settled = false;
+        var timer = setTimeout(function () {
+          if (settled) return;
+          settled = true; try { p.destroy(); } catch (x) {}
+          if (++tries < CLAIM_TRIES) return setTimeout(attempt, CLAIM_GAP);
+          reject({ type: 'timeout' });
+        }, CLAIM_OPEN_MS);
+        p.on('open', function () {
+          if (settled || self.closed) { try { p.destroy(); } catch (x) {} return; }
+          settled = true; clearTimeout(timer);
+          self.peer = p; self.code = code; self._wire(); resolve(code);
+        });
+        p.on('error', function (e) {
+          if (settled) { if (!self.closed) self.emit('error', e); return; }
+          settled = true; clearTimeout(timer); try { p.destroy(); } catch (x) {}
+          if (e && e.type === 'unavailable-id' && ++tries < CLAIM_TRIES) return setTimeout(attempt, CLAIM_GAP);
+          reject(e || { type: 'unavailable-id' });
+        });
+      }
+      attempt();
+    });
+  };
+  /** Hand the room to one connected player: full state to them, reconnect notice to everyone else, then release the peer id. */
+  Host.prototype.transfer = function (pid, state) {
+    if (this.closed) return;
+    this.closed = true; clearInterval(this._tick); unbindForeground(this);
+    this.send(pid, { t: 'handoff', state: state });
+    this.broadcast({ t: 'bye', reason: 'handoff' }, pid);
+    this.send(pid, { t: 'bye', reason: 'claim' });
+    var p = this.peer; this.peer = null;
+    setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 200);
   };
 
   // ---------------- Client ----------------
@@ -1058,10 +1151,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var p = new root.Peer(peerOpts()), done = false; self.peer = p;
       p.on('open', function () { if (!done) { done = true; res(p); } });
       p.on('error', function (e) {
-        if (e.type === 'peer-unavailable') { self._fail('no-room'); return; }
+        if (self.peer !== p) return;
+        // The broker sometimes answers "no such peer" for a live room (host just registered, or its
+        // signalling socket blipped). Retry a few times on a fresh peer: reusing the same peer drops
+        // the next EXPIRE and the attempt hangs until the open timeout.
+        if (e.type === 'peer-unavailable') {
+          self._miss = (self._miss || 0) + 1;
+          self.peer = null;
+          try { p.destroy(); } catch (x) {}
+          if (self._first && self._miss >= NO_ROOM_TRIES) { self._fail('no-room'); return; }
+          self._retry(MISS_MS); return;
+        }
         if (!done) { done = true; rej(e); }
+        else if (!self.closed && e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed')) self._retry();
       });
       p.on('disconnected', function () { if (!self.closed) setTimeout(function () { if (!self.closed && !p.destroyed && p.disconnected) try { p.reconnect(); } catch (x) {} }, 1500); });
+      bindForeground(self, function () {
+        if (self.peer && !self.peer.destroyed && self.peer.disconnected) try { self.peer.reconnect(); } catch (e) {}
+        if (self.state === 'online' && (!self.conn || !self.conn.open)) self._retry(0);
+      });
     });
   };
   Client.prototype._fail = function (why) {
@@ -1076,7 +1184,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (self.closed) return;
       var c = p.connect(self.hostId, { reliable: true, serialization: 'raw' }), opened = false;
       self.conn = c;
-      var to = setTimeout(function () { if (!opened && self.conn === c) { try { c.close(); } catch (e) {} self._retry(); } }, 12000);
+      // After the broker has already said the room is missing, don't wait out a full ICE timeout.
+      var to = setTimeout(function () {
+        if (opened || self.conn !== c) return;
+        try { c.close(); } catch (e) {}
+        if (!self._wasOnline && self._miss) {
+          self._miss++;
+          if (self._first && self._miss >= NO_ROOM_TRIES) { self._fail('no-room'); return; }
+        }
+        self._retry();
+      }, self._miss ? MISS_OPEN_MS : OPEN_MS);
       c.on('open', function () { opened = true; clearTimeout(to); self._last = Date.now(); c.send(JSON.stringify(self.hello)); });
       c.on('data', function (raw) {
         if (self.conn !== c) return;
@@ -1086,8 +1203,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         self._last = Date.now();
         if (m.t === 'ping') { try { c.send('{"t":"pong"}'); } catch (e) {} return; }
         if (m.t === 'reject') { var f = self._first; self._first = null; self.close(true); if (f) f.reject({ type: m.reason }); else self.emit('closed', m.reason); return; }
+        if (m.t === 'handoff') { self._migrate = m; return; }
+        if (m.t === 'bye' && m.reason === 'handoff') { self.emit('migrate'); self._retry(HANDOFF_MS); return; }
+        if (m.t === 'bye' && m.reason === 'claim') {
+          var payload = self._migrate || null, f2 = self._first; self._first = null; self.close(true); self.emit('claim', payload);
+          if (f2) f2.reject({ type: 'claim' }); return;
+        }
         if (m.t === 'bye') { var fb = self._first; self._first = null; self.close(true); if (fb) fb.reject({ type: m.reason || 'host-left' }); else self.emit('closed', m.reason || 'host-left'); return; }
-        if (m.t === 'welcome') { self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
+        if (m.t === 'welcome') { self._miss = 0; self._wasOnline = true; self._status('online'); self._since = null; if (self._first) { var g = self._first; self._first = null; g.resolve(m); } else self.emit('rejoined', m); }
         self.emit('msg', m);
       });
       c.on('close', function () { clearTimeout(to); if (self.conn === c && !self.closed) self._retry(); });
@@ -1098,27 +1221,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (Date.now() - self._last > CLIENT_DEAD_MS) { var c = self.conn; self.conn = null; try { c && c.close(); } catch (e) {} self._retry(); }
     }, 2000);
   };
-  Client.prototype._retry = function () {
+  Client.prototype._retry = function (delay) {
     var self = this; if (this.closed) return;
     if (this.state === 'online') { this._status('reconnecting'); this._since = Date.now(); }
-    if (this._since && Date.now() - this._since > GIVE_UP_MS) {
+    var limit = this._wasOnline ? REJOIN_MS : GIVE_UP_MS;
+    if (this._since && Date.now() - this._since > limit) {
       var f = this._first; this._first = null; this.close(true);
       if (f) f.reject({ type: 'timeout' }); else this.emit('closed', 'host-lost'); return;
     }
-    clearTimeout(this._rt); this._rt = setTimeout(function () { self._connect(); }, RETRY_MS);
+    var c = this.conn; this.conn = null;
+    try { if (c && c.close) c.close(); } catch (e) {}
+    clearTimeout(this._rt); this._rt = setTimeout(function () { self._connect(); }, delay == null ? RETRY_MS : delay);
   };
   Client.prototype.send = function (m) { var c = this.conn; try { if (c && c.open && this.state === 'online') { c.send(JSON.stringify(m)); return true; } } catch (e) {} return false; };
   /** Simulate a network drop (used by tests / when the app goes to background for long). */
   Client.prototype.drop = function () { var c = this.conn; this.conn = null; try { c && c.close(); } catch (e) {} if (this.state === 'online') this._retry(); };
   Client.prototype.close = function (silent) {
-    if (this.closed) return; this.closed = true; clearTimeout(this._rt); clearInterval(this._watch);
+    if (this.closed) return; this.closed = true; clearTimeout(this._rt); clearInterval(this._watch); unbindForeground(this);
     var c = this.conn, p = this.peer; this.conn = null;
     try { c && c.close(); } catch (e) {} setTimeout(function () { try { p && p.destroy(); } catch (e) {} }, 200);
     this._status('closed');
   };
 
   root.Net = { Host: Host, Client: Client, identity: identity, available: available, ice: ice, DEFAULT_ICE: DEFAULT_ICE,
+    NO_ROOM_TRIES: NO_ROOM_TRIES, MISS_MS: MISS_MS, MISS_OPEN_MS: MISS_OPEN_MS, HANDOFF_MS: HANDOFF_MS,
     shareBase: 'https://howenghong.github.io/macau-casino-apps/' };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.Net;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script id="mp-ui">
@@ -1153,15 +1281,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return M.normCode(m[1]);
   }
   var ERR = {
-    'no-room': '找不到此房間（房號錯誤或房主已離開）', full: '房間已滿（最多 7 人）', 'bad-token': '身份驗證失敗，請重新加入',
+    'no-room': '找不到此房間（請核對房號，並確認房主仍在房間）', full: '房間已滿（最多 7 人）', 'bad-token': '身份驗證失敗，請重新加入',
     timeout: '連線逾時，請檢查網絡後再試', 'host-left': '房主已離開房間', 'host-lost': '與房主失去連線', kicked: '你已被移出房間',
     network: '無法連接配對伺服器，請檢查網絡', 'server-error': '配對伺服器暫時無法使用，請稍後再試', 'socket-error': '無法連接配對伺服器，請檢查網絡',
-    'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號衝突，請再試一次',
+    'socket-closed': '與配對伺服器的連線中斷', 'browser-incompatible': '此瀏覽器不支援 WebRTC 聯機', 'unavailable-id': '房號暫時被佔用，請再試一次',
     'no-net': '此版本無法使用聯機功能', denied: '房主拒絕加入', rejected: '房主拒絕了你的加入申請', started: '牌局進行中，請稍候再加入'
   };
-  function errText(e) { var k = e && (e.type || e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
+  var HINT = {
+    'no-room': '房主請留在房間畫面。雙方不要同時切去其他程式。核對 6 位房號後可再試一次。',
+    timeout: '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    'host-lost': '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    'socket-closed': '請雙方留在畫面稍候。流動網絡請保持上網，然後再試一次。',
+    network: '請檢查網絡是否已連接，稍候再試一次。',
+    'socket-error': '請檢查網絡是否已連接，稍候再試一次。',
+    'server-error': '配對伺服器暫時繁忙，請稍候再試一次。',
+    'unavailable-id': '上一任房主剛離開，房號尚未釋出。請稍候再試一次。'
+  };
+  function errKey(e) { return e && (e.type || e); }
+  function errText(e) { var k = errKey(e); return ERR[k] || ('連線失敗（' + (k || '未知錯誤') + '）'); }
+  function errHint(e) { return HINT[errKey(e)] || ''; }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  root.MPUI = { getName: getName, setName: setName, shareUrl: shareUrl, qrSvg: qrSvg, copy: copy, share: share, hashCode: hashCode, errText: errText, esc: esc };
+  root.MPUI = { getName: getName, setName: setName, shareUrl: shareUrl, qrSvg: qrSvg, copy: copy, share: share, hashCode: hashCode, errText: errText, errHint: errHint, esc: esc };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script id="road-room">
@@ -1173,6 +1313,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var $ = function (id) { return document.getElementById(id); }, esc = U.esc, PREFIX = 'mroad-v1-';
   var R = null;            // current room: {role:'host'|'client', code, mode, net, ...}
   var NAME = A.NAME;
+  var lastFail = null;     // { msg, hint, code } shown on the join form
 
   // ---------- DOM ----------
   var btn = document.createElement('button'); btn.className = 'hbtn'; btn.id = 'bRoom'; btn.textContent = '聯機';
@@ -1186,13 +1327,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   function renderPanel(err) {
     var b = $('rmBody'), h = '';
+    if (!err && lastFail && lastFail.msg) err = lastFail.msg;
     if (!R) {
       h += '<div class="rmf"><label>暱稱</label><input id="rmName" maxlength="12" placeholder="例如：阿明" value="' + esc(U.getName()) + '"></div>' +
         '<div class="rmsec"><b>開新房間</b><div class="rmseg" id="rmMode"><button data-m="host" class="on">只限房主輸入</button><button data-m="all">所有人可輸入</button></div>' +
         '<button class="rmbig ok" id="rmHost">開房</button></div>' +
         '<div class="rmsec"><b>加入房間</b><div class="rmrow"><input id="rmCode" maxlength="7" placeholder="6 位房號" autocapitalize="characters" autocomplete="off" spellcheck="false" value="' + esc(pendingCode || '') + '"><button class="rmbig" id="rmJoin">加入</button></div></div>' +
-        '<p class="rmnote">所有裝置會即時看到同一靴路紙、統計及預測。使用點對點連線（WebRTC），需要上網；部分公司／流動網絡可能無法直接連線。</p>' +
+        '<p class="rmnote">所有裝置會即時看到同一靴路紙、統計及預測。使用點對點連線（WebRTC），需要上網；流動網絡連不上時會自動改經中繼。房主可把房間交給在線的朋友，房號不變。</p>' +
         (err ? '<p class="rmerr" id="rmErr">' + esc(err) + '</p>' : '') +
+        (lastFail && lastFail.hint ? '<p class="rmnote">' + esc(lastFail.hint) + '</p>' : '') +
+        (lastFail && lastFail.code ? '<button class="rmbig" id="rmRetry">再試一次</button>' : '') +
         '<div class="row"><button id="rmClose">關閉</button></div>';
     } else if (R.pending) {
       h += '<p class="rmwait">' + esc(R.pending) + '</p><div class="row"><button id="rmCancel">取消</button></div>';
@@ -1206,7 +1350,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<div class="rmsec"><b>房內裝置（' + R.players.length + '/7）</b><ul id="rmList">' + R.players.map(function (p) {
           return '<li class="' + (p.on ? '' : 'off') + '">' + esc(p.name) + (p.host ? ' <i>房主</i>' : '') + (p.pid === R.me ? ' <i class="me">你</i>' : '') + (p.on ? '' : ' <small>離線</small>') + '</li>';
         }).join('') + '</ul></div>' +
-        '<div class="row"><button id="rmLeave">' + (isHost ? '解散房間' : '離開房間') + '</button><button class="ok" id="rmClose">關閉</button></div>';
+        '<div class="row">' + (isHost && roadCandidates().length ? '<button id="rmHand">交給其他玩家</button>' : '') + '<button id="rmLeave">' + (isHost ? '解散房間' : '離開房間') + '</button><button class="ok" id="rmClose">關閉</button></div>' +
+        (R.pick ? '<div class="rmsec"><b>交給誰繼續？</b>' + roadCandidates().map(function (p) { return '<button class="rmbig" data-hand="' + esc(p.pid) + '">' + esc(p.name) + '</button>'; }).join('') + '<p class="rmnote">房號不變。你會離開，其他裝置重新連上。</p></div>' : '');
     }
     b.innerHTML = h;
     var on = function (id, f) { var e = $(id); if (e) e.onclick = f; };
@@ -1214,13 +1359,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var mode = 'host';
     document.querySelectorAll('#rmMode button').forEach(function (x) { x.onclick = function () { mode = x.dataset.m; document.querySelectorAll('#rmMode button').forEach(function (y) { y.classList.toggle('on', y === x); }); }; });
     document.querySelectorAll('#rmMode2 button').forEach(function (x) { x.onclick = function () { setMode(x.dataset.m); }; });
-    on('rmHost', function () { U.setName($('rmName').value); host(mode); });
-    on('rmJoin', function () { U.setName($('rmName').value); var c = M.normCode($('rmCode').value); if (!c) { renderPanel('房號應為 6 位英文字母／數字'); return; } join(c); });
+    on('rmHost', function () { lastFail = null; U.setName($('rmName').value); host(mode); });
+    on('rmJoin', function () { U.setName($('rmName').value); var c = M.normCode($('rmCode').value); if (!c) { lastFail = null; renderPanel('房號應為 6 位英文字母／數字'); return; } join(c); });
+    on('rmRetry', function () { var c = lastFail && lastFail.code; lastFail = null; if (c) join(c); });
     on('rmShare', function () { U.share('一齊記路：房號 ' + R.code, U.shareUrl('road/', R.code)).then(function (r) { if (r === 'copied') A.toast('已複製邀請連結'); }); });
     on('rmCopy', function () { U.copy(R.code).then(function (ok) { A.toast(ok ? '已複製房號 ' + R.code : '房號：' + R.code); }); });
-    on('rmLeave', function () {
-      hide(); A.ask(isHostNow() ? '解散房間？' : '離開房間？', isHostNow() ? '其他裝置會返回各自的單機記路。' : '本房牌靴會存入你的牌靴紀錄，然後返回單機記路。', isHostNow() ? '解散' : '離開').then(function (ok) { if (ok) { leave(); A.toast('已離開房間'); } });
+    on('rmHand', function () {
+      var cs = roadCandidates(); if (!cs.length) { A.toast('沒有在線玩家可以接手'); return; }
+      if (cs.length === 1) { hide(); A.ask('交給 ' + cs[0].name + ' 繼續？', '房號不變。你會離開，其他裝置會重新連上同一房號。', '交接').then(function (ok) { if (ok) doRoadHandoff(cs[0].pid); }); return; }
+      R.pick = !R.pick; renderPanel();
     });
+    document.querySelectorAll('[data-hand]').forEach(function (b) { b.onclick = function () { var pid = b.getAttribute('data-hand'); R.pick = false; hide(); doRoadHandoff(pid); }; });
+    on('rmLeave', function () {
+      hide(); A.ask(isHostNow() ? '解散房間？' : '離開房間？', isHostNow() ? '其他裝置會返回各自的單機記路。要把房間留下，請先交給其他玩家。' : '本房牌靴會存入你的牌靴紀錄，然後返回單機記路。', isHostNow() ? '解散' : '離開').then(function (ok) { if (ok) { leave(); A.toast('已離開房間'); } });
+    });
+  }
+  function roadCandidates() {
+    if (!R || R.role !== 'host' || !R.ledger || !R.net) return [];
+    return R.ledger.list().filter(function (p) { return R.net.online(p.pid); });
   }
   function isHostNow() { return R && R.role === 'host'; }
   function stText() { return { online: '已連線', reconnecting: '重新連線中…', connecting: '連線中…' }[R.status] || ''; }
@@ -1244,11 +1400,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     R = { role: 'host', mode: mode === 'all' ? 'all' : 'host', name: M.cleanName(name), me: id.pid, rev: 0, players: [], status: 'connecting', pending: '正在開房…', ledger: new M.Ledger(M.MAX_PLAYERS - 1) };
     renderPanel();
     var h = R.net = new Net.Host('road', PREFIX, { onHello: function (m) { return R.ledger.join(m); } }), me = R;
+    wireRoad(me, h);
+    h.start().then(function (code) {
+      if (R !== me) { h.close(); return; }
+      me.code = code; me.pending = null; me.status = 'online'; lastFail = null; playersMsg(); A.room = api; refresh(); A.toast('房間已開：' + code);
+    }, function (e) { if (R !== me) return; R = null; lastFail = { msg: U.errText(e), hint: U.errHint(e) }; renderPanel(lastFail.msg); pill(); });
+  }
+  function wireRoad(me, h) {
     h.on('join', function (pid, m, rejoin) {
       if (R !== me) return;
       h.send(pid, { t: 'welcome', you: pid, code: me.code, host: me.name });
       h.broadcast(playersMsg()); h.send(pid, hostState());
-      A.toast(R.ledger.get(pid).name + (rejoin ? ' 已重新連線' : ' 加入了房間')); refresh();
+      var p = me.ledger.get(pid); A.toast((p ? p.name : '玩家') + (rejoin ? ' 已重新連線' : ' 加入了房間')); refresh();
     });
     h.on('msg', function (pid, m) {
       if (R !== me) return; var p = me.ledger.get(pid); if (!p) return;
@@ -1259,10 +1422,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     h.on('drop', function (pid) { if (R !== me) return; var p = me.ledger.get(pid); h.broadcast(playersMsg()); if (p) A.toast(p.name + ' 已離線'); refresh(); });
     h.on('error', function () {});
-    h.start().then(function (code) {
-      if (R !== me) { h.close(); return; }
-      me.code = code; me.pending = null; me.status = 'online'; playersMsg(); A.room = api; refresh(); A.toast('房間已開：' + code);
-    }, function (e) { if (R !== me) return; R = null; renderPanel(U.errText(e)); pill(); });
   }
   function announce(by, m) {
     if (m.t === 'add') A.justAdded = true;
@@ -1283,16 +1442,64 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var id = Net.identity('road'), name = M.cleanName(U.getName() || '玩家');
     R = { role: 'client', code: code, mode: 'host', name: name, me: id.pid, rev: -1, players: [], status: 'connecting', pending: '正在加入房間 ' + code + '…' };
     renderPanel();
+    lastFail = null;
     var c = R.net = new Net.Client('road', PREFIX, code, { t: 'hello', v: 1, app: 'road', pid: id.pid, tok: id.tok, name: name }), me = R;
     c.on('msg', function (m) { if (R === me) onHost(m); });
-    c.on('status', function (s) { if (R !== me || me.pending) return; me.status = s; refresh(); if (s === 'reconnecting') A.toast('連線中斷，正在重新連線…'); });
-    c.on('rejoined', function () { if (R === me) A.toast('已重新連線'); });
-    c.on('closed', function (why) { if (R !== me) return; var had = A.T.hands().length; leave(true); A.ask('已離開房間', U.errText(why) + '。' + (had ? '本房牌靴已存入你的牌靴紀錄，' : '') + '已返回單機記路。', '知道了'); });
+    c.on('status', function (s) { if (R !== me || me.pending) return; me.status = s; refresh(); if (s === 'reconnecting' && !me._migrating) A.toast('連線中斷，正在重新連線…'); });
+    c.on('migrate', function () { if (R === me) { me._migrating = true; A.toast('房主交接中，正在重新連線…'); } });
+    c.on('claim', function (payload) {
+      if (R !== me) return;
+      var st = payload && payload.state;
+      if (!st || st.v !== 1 || st.app !== 'road' || st.code !== me.code || !st.you || st.you.pid !== me.me) { roadEnded('房主已離開，交接未能完成'); return; }
+      becomeRoadHost(st);
+    });
+    c.on('rejoined', function () { if (R === me) { me._migrating = false; A.toast('已重新連線'); } });
+    c.on('closed', function (why) { if (R !== me) return; roadEnded(U.errText(why)); });
     c.start().then(function () {
       if (R !== me) return; me.pending = null; me.status = 'online'; me.tracker = mirror(); A.setT(me.tracker); A.room = api;
       try { sessionStorage.setItem('mroad.room', code); } catch (e) {}
-      hide(); refresh(); A.render(); A.toast('已加入房間 ' + code);
-    }, function (e) { if (R !== me) return; R = null; pill(); renderPanel(U.errText(e)); if (!ov.classList.contains('show')) A.toast(U.errText(e)); });
+      lastFail = null; hide(); refresh(); A.render(); A.toast('已加入房間 ' + code);
+    }, function (e) {
+      if (R !== me) return; pendingCode = code; lastFail = { msg: U.errText(e), hint: U.errHint(e), code: code };
+      R = null; pill(); renderPanel(lastFail.msg); if (!ov.classList.contains('show')) A.toast(lastFail.msg);
+    });
+  }
+  function roadEnded(why) {
+    var had = A.T && A.T.hands ? A.T.hands().length : 0;
+    leave(true);
+    A.ask('已離開房間', why + '。' + (had ? '本房牌靴已存入你的牌靴紀錄，' : '') + '已返回單機記路。', '知道了');
+  }
+  function adoptShoe(shoe) {
+    var local = A.local, cur = local.state.current;
+    if (cur && cur.hands && cur.hands.length && cur.id !== shoe.id) {
+      cur.ended = Date.now(); local.state.past.unshift(cur);
+      if (local.state.past.length > TC.MAX_PAST) local.state.past.length = TC.MAX_PAST;
+    }
+    local.state.current = shoe; local.state.shoeNo = shoe.no; local.save(); A.setT(local);
+  }
+  function becomeRoadHost(st) {
+    var me = R;
+    var rows = (st.ledger && st.ledger.players || []).filter(function (p) { return p.pid !== me.me; });
+    var ledger = M.Ledger.restore({ max: st.ledger && st.ledger.max, start: 0, approve: false, players: rows });
+    var cleaned = M.cleanRoadState({ rev: 1, mode: st.mode, shoe: st.shoe });
+    if (!ledger || !cleaned) { roadEnded('交接未能完成'); return; }
+    me.role = 'host'; me.mode = cleaned.mode; me.ledger = ledger; me.pending = null; me.status = 'connecting'; me.rev = 0; me.pick = false;
+    adoptShoe(cleaned.shoe);
+    var h = me.net = new Net.Host('road', PREFIX, { onHello: function (m) { return me.ledger.join(m); } });
+    wireRoad(me, h); A.room = api; A.toast('房主已離開，正在接手房間…'); refresh();
+    h.claim(st.code).then(function (code) {
+      if (R !== me) { h.close(); return; }
+      me.code = code; me.status = 'online'; playersMsg(); refresh(); A.render(); A.toast('你已成為房主，房號不變');
+    }, function (e) { if (R !== me) return; roadEnded(U.errText(e)); });
+  }
+  function doRoadHandoff(pid) {
+    var me = R; if (!me || me.role !== 'host' || !me.net || !me.net.online(pid)) { A.toast('對方已離線'); return; }
+    var guest = me.ledger.get(pid); if (!guest) return;
+    var rows = [];
+    me.ledger.list().forEach(function (p) { if (p.pid !== pid) rows.push({ pid: p.pid, tok: p.tok, name: p.name, bal: p.bal, issued: p.issued, status: p.status, req: p.req }); });
+    var snap = { v: 1, app: 'road', code: me.code, mode: me.mode, you: { pid: guest.pid, name: guest.name }, ledger: { max: me.ledger.max, start: 0, approve: false, players: rows }, shoe: A.T.state.current };
+    var net = me.net; me.net = null; net.transfer(pid, snap);
+    leave(true); A.toast('已把房間交給 ' + guest.name);
   }
   function onHost(m) {
     if (m.t === 'state') {
@@ -1337,7 +1544,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     pill(); if (ov.classList.contains('show')) renderPanel(); A.render();
   }
-  window.addEventListener('pagehide', function () { if (R && R.role === 'host') try { R.net.close(); } catch (e) {} });
+  // Keep the room alive when the host app is backgrounded (sending the code, locking the phone).
+  // A real leave still closes the peer from leave().
   var back = window.onAndroidBack;
   window.onAndroidBack = function () { if (ov.classList.contains('show')) { hide(); return true; } return back ? back() : false; };
   A.roomApi = { host: host, join: join, leave: leave, show: show, get: function () { return R; } };
