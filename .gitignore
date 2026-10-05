@@ -1,0 +1,5 @@
+# Signing keys stay outside the repository.
+*.jks
+*.keystore
+keystore.properties
+signing-key-backup*.zip

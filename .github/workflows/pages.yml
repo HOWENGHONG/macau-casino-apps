@@ -1,4 +1,6 @@
 # Deploys the repository root to GitHub Pages on every push to main.
+# ubuntu-26.04 is pinned before ubuntu-latest moves there on 2026-10-19.
+# The action majors below run on Node 24.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -13,17 +15,19 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
         with:
           enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: .
+          # v3 included dotfiles. v5 skips them unless this is set, which would drop .nojekyll.
+          include-hidden-files: "true"
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
