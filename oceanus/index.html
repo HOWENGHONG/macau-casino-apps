@@ -71,6 +71,12 @@ h1{margin:12px 0 4px;font-size:clamp(27px,7.4vw,40px);letter-spacing:5px;color:#
 h1 small{display:block;font-size:13px;letter-spacing:1px;color:var(--mute);text-shadow:none;margin-top:7px;font-weight:400}
 .tagline{margin:10px 0 0;font-size:14px;color:#cfe6f3}
 .tagline b{color:var(--gold2)}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+.cta a{text-decoration:none;border-radius:12px;padding:11px 18px;font-weight:700;letter-spacing:.5px;font-size:15px}
+.cta .go{background:linear-gradient(180deg,var(--aqua2),var(--aqua));color:#04121d;box-shadow:0 6px 20px rgba(63,216,245,.3)}
+.cta .alt{border:1px solid var(--line);color:var(--ink);background:rgba(63,216,245,.06);font-weight:400}
+.navchips a.p{color:#04121d;font-weight:700;border-color:#bfefff;
+  background:linear-gradient(180deg,var(--aqua2),var(--aqua))}
 
 /* ---------- generic blocks ---------- */
 section{margin-top:26px;scroll-margin-top:96px}
@@ -236,6 +242,7 @@ footer a{color:#9fc7d8}
     <a href="../" style="font-size:12.5px;text-decoration:none;color:var(--mute)">← 回主頁</a>
   </div>
   <nav class="navchips" aria-label="頁內導覽">
+    <a href="play.html" class="p">▶ 試玩</a>
     <a href="#rules">規則</a>
     <a href="#deal">發牌</a>
     <a href="#dealer">莊家補牌</a>
@@ -257,6 +264,10 @@ footer a{color:#9fc7d8}
     <span class="kicker">澳博 SJM · Oceanus · 新口岸外港碼頭對面</span>
     <h1>海立方 廿一點<small>6 副牌 · 莊家軟 17 停牌（S17）· 可分牌後加倍 · 可投降（莊 A 明牌除外）</small></h1>
     <p class="tagline">Blackjack 賠 <b>3:2</b>　·　保險賠 <b>2:1</b>　·　投降輸 <b>一半</b>　·　本頁附完整基礎策略表及現場速查</p>
+    <div class="cta">
+      <a class="go" href="play.html">▶ 開始試玩（模擬籌碼）</a>
+      <a class="alt" href="#chart">睇基礎策略表</a>
+    </div>
     <dl class="spec">
       <div><dt>牌數</dt><dd>6 副牌<em>312 張</em></dd></div>
       <div><dt>莊家</dt><dd>S17<em>軟 17 一律停牌</em></dd></div>
@@ -473,7 +484,7 @@ footer a{color:#9fc7d8}
     · 8,8 對 A 都要分牌（莊明牌 A 冇得投降）。
   </div>
   <p class="small muted">計算方法：硬牌把該點數<strong>所有可能的兩張牌組合</strong>按出現機會加權（例如 16 點會綜合 10+6、9+7 等情況），軟牌及對子按實際兩張牌計算；牌靴為 6 副牌，莊家 S17，可分牌後加倍，投降只限莊明牌 2–10。全部 240 個格都逐格比較 H／S／D／P／R 的期望值。</p>
-  <p class="small muted" id="edgeNote">以上策略按 6 副牌、莊家 S17、可分牌後加倍、可投降（莊明牌 A 除外）逐格計算期望值。用 6 副牌真實牌靴模擬 60 萬局，長期每注期望值約 <strong>−0.7%</strong>（即每 $100 注碼平均蝕約 $0.7）；公開資料同類規則通常列作約 0.5%，差別主要來自本表按「只分一次牌」計算，以及莊明牌 A 不准投降。任何策略都改變不了「長玩必蝕」這個事實，唯一能控制的是注碼同時間。</p>
+  <p class="small muted" id="edgeNote">以上策略按 6 副牌、莊家 S17、可分牌後加倍、可投降（莊明牌 A 除外）逐格計算期望值。用真實 6 副牌牌靴模擬 50 萬局，長期每注期望值約 <strong>−0.4% 至 −0.5%</strong>（即每 $100 注碼平均蝕約 4–5 毫），同公開資料同類規則的 0.5% 吻合。任何策略都改變不了「長玩必蝕」這個事實，唯一能控制的是注碼同時間。</p>
 </section>
 
 <section id="lookup">

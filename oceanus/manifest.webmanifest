@@ -15,6 +15,13 @@
     "reference",
     "utilities"
   ],
+  "shortcuts": [
+    {
+      "name": "試玩廿一點",
+      "short_name": "試玩",
+      "url": "./play.html"
+    }
+  ],
   "icons": [
     {
       "src": "icon-192.png",
