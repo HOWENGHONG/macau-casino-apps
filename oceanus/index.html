@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04121d">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="海立方（Oceanus，澳博 SJM）廿一點規則：6 副牌、S17、可分牌後加倍、可投降（莊 A 除外）、Blackjack 3:2。附完整基礎策略表、投降判斷、手勢、保險及籌碼面額，現場速查。">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="海立方廿一點">
+<title>海立方 廿一點 · 官方規則與基礎策略表</title>
+<style>
+:root{
+  --deep:#03101a; --deep2:#07202f; --ink:#e8f4fb; --mute:#9db8c9; --line:rgba(110,205,240,.18);
+  --panel:rgba(126,226,255,.055); --aqua:#3fd8f5; --aqua2:#9cf0ff; --gold:#f2c75c; --gold2:#ffe6a3;
+  --hit:#ff9d9d; --hit-bg:rgba(214,74,74,.20); --stand:#86efc4; --stand-bg:rgba(46,160,120,.20);
+  --dbl:#ffd979; --dbl-bg:rgba(214,164,52,.20); --spl:#c9b4ff; --spl-bg:rgba(122,92,214,.22);
+  --sur:#ffb27a; --sur-bg:rgba(200,96,40,.22);
+  --r:16px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);line-height:1.7;
+  font-family:"Noto Sans TC","PingFang HK","Microsoft JhengHei",system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(1100px 520px at 82% -10%,rgba(63,216,245,.20),transparent 62%),
+    radial-gradient(760px 420px at 8% 8%,rgba(63,216,245,.10),transparent 60%),
+    linear-gradient(180deg,#04121d 0%,#03101a 42%,#040d15 100%);
+  background-attachment:fixed;
+  padding-bottom:max(26px,env(safe-area-inset-bottom));
+  overflow-x:hidden;
+}
+a{color:var(--aqua2)}
+main{max-width:1000px;margin:0 auto;
+  padding:0 max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left))}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:40;margin:0;
+  padding:max(8px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));
+  background:linear-gradient(180deg,rgba(3,16,26,.96),rgba(3,16,26,.82) 70%,rgba(3,16,26,0));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.top .row{display:flex;gap:10px;align-items:center;justify-content:space-between;max-width:1000px;margin:0 auto}
+.brand{display:flex;gap:9px;align-items:center;font-weight:700;letter-spacing:.5px;color:var(--aqua2);font-size:15px}
+.brand img{width:28px;height:28px;border-radius:8px;display:block}
+.navchips{display:flex;gap:6px;overflow-x:auto;margin:7px auto 0;max-width:1000px;padding-bottom:2px;scrollbar-width:none}
+.navchips::-webkit-scrollbar{display:none}
+.navchips a{flex:none;font-size:12.5px;text-decoration:none;color:var(--ink);border:1px solid var(--line);
+  border-radius:999px;padding:3px 11px;background:rgba(63,216,245,.06);white-space:nowrap}
+.navchips a:active{background:rgba(63,216,245,.18)}
+
+/* ---------- hero ---------- */
+header.hero{position:relative;margin:6px 0 4px;padding:26px 18px 22px;border-radius:20px;overflow:hidden;
+  border:1px solid rgba(120,225,255,.22);
+  background:linear-gradient(160deg,rgba(9,44,64,.92),rgba(4,20,32,.92))}
+header.hero::before{content:"";position:absolute;inset:-30% -10% auto auto;width:360px;height:360px;
+  background:
+    repeating-linear-gradient(0deg,rgba(63,216,245,.16) 0 1px,transparent 1px 34px),
+    repeating-linear-gradient(90deg,rgba(63,216,245,.16) 0 1px,transparent 1px 34px);
+  transform:rotate(18deg);opacity:.55;mask-image:radial-gradient(closest-side,#000,transparent)}
+header.hero::after{content:"";position:absolute;inset:auto -60px -120px auto;width:320px;height:320px;
+  background:radial-gradient(closest-side,rgba(63,216,245,.28),transparent)}
+.hero-in{position:relative;z-index:1}
+.kicker{display:inline-flex;gap:7px;align-items:center;font-size:12.5px;letter-spacing:2px;color:var(--aqua);
+  border:1px solid rgba(63,216,245,.4);border-radius:999px;padding:2px 11px;background:rgba(63,216,245,.08)}
+h1{margin:12px 0 4px;font-size:clamp(27px,7.4vw,40px);letter-spacing:5px;color:#fff;
+  text-shadow:0 0 26px rgba(63,216,245,.45),0 2px 0 rgba(0,0,0,.4)}
+h1 small{display:block;font-size:13px;letter-spacing:1px;color:var(--mute);text-shadow:none;margin-top:7px;font-weight:400}
+.tagline{margin:10px 0 0;font-size:14px;color:#cfe6f3}
+.tagline b{color:var(--gold2)}
+
+/* ---------- generic blocks ---------- */
+section{margin-top:26px;scroll-margin-top:96px}
+h2{font-size:20px;color:var(--aqua2);letter-spacing:1px;margin:0 0 10px;display:flex;gap:9px;align-items:center}
+h2 .n{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:9px;font-size:13px;
+  background:rgba(63,216,245,.14);border:1px solid rgba(63,216,245,.34);color:var(--aqua2);letter-spacing:0}
+h3{font-size:15.5px;color:var(--gold2);margin:16px 0 6px}
+p{margin:8px 0}
+.muted{color:var(--mute)}
+.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.card + .card{margin-top:10px}
+.grid{display:grid;gap:10px}
+@media(min-width:640px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+ul,ol{margin:8px 0;padding-left:22px}
+li{margin:5px 0}
+strong,b{color:#fff}
+.hl{color:var(--gold2);font-weight:700}
+.tag{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--aqua);vertical-align:middle;white-space:nowrap}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;color:#ffe6a3;background:rgba(255,230,163,.08);
+  border:1px solid rgba(255,230,163,.16);border-radius:5px;padding:1px 5px}
+
+/* ---------- spec strip ---------- */
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:9px;margin-top:12px}
+.spec div{background:linear-gradient(160deg,rgba(63,216,245,.11),rgba(63,216,245,.03));
+  border:1px solid rgba(120,225,255,.22);border-radius:13px;padding:9px 12px}
+.spec dt{font-size:11.5px;letter-spacing:1px;color:var(--mute);margin:0}
+.spec dd{margin:2px 0 0;font-size:15px;font-weight:700;color:#fff}
+.spec dd em{font-style:normal;font-size:12px;font-weight:400;color:var(--mute);display:block;margin-top:1px}
+
+/* ---------- flow steps ---------- */
+.steps{counter-reset:s;list-style:none;padding:0;margin:8px 0 0}
+.steps li{counter-increment:s;position:relative;padding:10px 12px 10px 44px;margin:8px 0;
+  background:var(--panel);border:1px solid var(--line);border-radius:13px;font-size:14px}
+.steps li::before{content:counter(s);position:absolute;left:12px;top:10px;width:22px;height:22px;border-radius:7px;
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:#04121d;
+  background:linear-gradient(180deg,var(--aqua2),var(--aqua))}
+
+/* ---------- action cards ---------- */
+.acts{display:grid;gap:10px;margin-top:10px}
+@media(min-width:700px){.acts{grid-template-columns:1fr 1fr}}
+.act{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px 12px 14px}
+.act .hd{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.act .hd b{font-size:16px;letter-spacing:.5px}
+.act .hd span{font-size:12px;color:var(--mute);letter-spacing:1px}
+.act .hd i{font-style:normal;font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid;margin-left:auto}
+.act p{margin:7px 0 0;font-size:13.5px;color:#d5e8f2}
+.ges{margin-top:8px;font-size:13px;color:var(--gold2);background:rgba(242,199,92,.08);
+  border:1px dashed rgba(242,199,92,.32);border-radius:10px;padding:6px 10px}
+.act.hit .hd i{color:var(--hit);border-color:rgba(255,157,157,.5)}
+.act.stand .hd i{color:var(--stand);border-color:rgba(134,239,196,.5)}
+.act.dbl .hd i{color:var(--dbl);border-color:rgba(255,217,121,.5)}
+.act.spl .hd i{color:var(--spl);border-color:rgba(201,180,255,.5)}
+.act.sur .hd i{color:var(--sur);border-color:rgba(255,178,122,.5)}
+
+/* ---------- callouts ---------- */
+.callout{border-left:3px solid var(--gold);background:linear-gradient(90deg,rgba(242,199,92,.10),transparent);
+  border-radius:0 12px 12px 0;padding:11px 14px;margin:12px 0;font-size:13.5px}
+.callout b{color:var(--gold2)}
+.callout.warn{border-left-color:#e8694a;background:linear-gradient(90deg,rgba(232,105,74,.12),transparent)}
+.callout.ok{border-left-color:var(--stand);background:linear-gradient(90deg,rgba(134,239,196,.10),transparent)}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:14px;
+  background:rgba(2,14,22,.55);margin-top:10px}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid rgba(110,205,240,.12);vertical-align:top}
+thead th{position:sticky;top:0;background:#061e2c;color:var(--aqua2);font-size:12.5px;letter-spacing:.5px;z-index:2}
+tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
+table.kv td:first-child{color:var(--mute);white-space:nowrap;width:96px}
+
+/* strategy matrix */
+.matrix{width:auto;min-width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+.matrix th.hand{position:sticky;left:0;z-index:3;background:#061e2c;white-space:nowrap;font-weight:700;
+  color:#cfe6f3;border-right:1px solid rgba(110,205,240,.2);min-width:88px;font-size:12.5px}
+.matrix thead th{position:sticky;top:0;z-index:4;text-align:center;min-width:36px;padding:6px 2px;background:#061e2c}
+.matrix thead th.hand{z-index:5;left:0;text-align:left}
+.matrix td{text-align:center;padding:5px 2px;font-weight:700;font-size:13px;border-left:1px solid rgba(110,205,240,.06)}
+.matrix td.blank{background:rgba(255,255,255,.02);color:#2b4655}
+.matrix sup{font-size:9.5px;font-weight:600;opacity:.72;margin-left:1px}
+td.a-H{background:var(--hit-bg);color:var(--hit)}
+td.a-S{background:var(--stand-bg);color:var(--stand)}
+td.a-D{background:var(--dbl-bg);color:var(--dbl)}
+td.a-P{background:var(--spl-bg);color:var(--spl)}
+td.a-R{background:var(--sur-bg);color:var(--sur)}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:12.5px}
+.legend span{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.legend i{width:11px;height:11px;border-radius:3px;display:block;font-style:normal}
+.lg-H i{background:var(--hit)}.lg-S i{background:var(--stand)}.lg-D i{background:var(--dbl)}
+.lg-P i{background:var(--spl)}.lg-R i{background:var(--sur)}
+
+/* ---------- lookup ---------- */
+.lookup{background:linear-gradient(165deg,rgba(9,44,64,.95),rgba(4,18,29,.95));
+  border:1px solid rgba(120,225,255,.28);border-radius:18px;padding:14px 15px}
+.who{display:grid;gap:10px}
+@media(min-width:620px){.who{grid-template-columns:1fr 1fr}}
+.picker{background:rgba(2,14,22,.5);border:1px solid var(--line);border-radius:13px;padding:10px 11px}
+.picker .lb{font-size:11.5px;letter-spacing:1.5px;color:var(--mute);margin-bottom:7px}
+.btns{display:flex;flex-wrap:wrap;gap:5px}
+.btns button{font:inherit;font-size:13px;min-width:34px;padding:5px 8px;border-radius:9px;cursor:pointer;
+  border:1px solid rgba(120,225,255,.24);background:rgba(63,216,245,.07);color:var(--ink)}
+.btns button[aria-pressed="true"]{background:linear-gradient(180deg,var(--aqua2),var(--aqua));color:#04121d;
+  border-color:#bfefff;font-weight:700}
+.btns button.red[aria-pressed="true"]{background:linear-gradient(180deg,#ffb2b2,#e8694a);border-color:#ffd0c0;color:#2b0805}
+.ynote{font-size:12px;color:var(--mute);margin-top:7px}
+.verdict{margin-top:12px;display:flex;gap:13px;align-items:center;border-radius:15px;padding:13px 15px;
+  border:1px solid rgba(120,225,255,.3);background:rgba(2,14,22,.55)}
+.verdict .big{flex:none;width:74px;height:74px;border-radius:18px;display:grid;place-items:center;
+  font-size:30px;font-weight:800;letter-spacing:1px;box-shadow:inset 0 0 26px rgba(0,0,0,.35)}
+.verdict .txt{min-width:0}
+.verdict .txt b{display:block;font-size:18px;letter-spacing:1px}
+.verdict .txt span{display:block;font-size:13px;color:var(--mute);margin-top:3px}
+.verdict.H{background:linear-gradient(90deg,rgba(214,74,74,.20),rgba(2,14,22,.5))}
+.verdict.H .big{background:rgba(214,74,74,.28);color:var(--hit);border:1px solid rgba(255,157,157,.45)}
+.verdict.S{background:linear-gradient(90deg,rgba(46,160,120,.20),rgba(2,14,22,.5))}
+.verdict.S .big{background:rgba(46,160,120,.28);color:var(--stand);border:1px solid rgba(134,239,196,.45)}
+.verdict.D{background:linear-gradient(90deg,rgba(214,164,52,.20),rgba(2,14,22,.5))}
+.verdict.D .big{background:rgba(214,164,52,.26);color:var(--dbl);border:1px solid rgba(255,217,121,.45)}
+.verdict.P{background:linear-gradient(90deg,rgba(122,92,214,.24),rgba(2,14,22,.5))}
+.verdict.P .big{background:rgba(122,92,214,.30);color:var(--spl);border:1px solid rgba(201,180,255,.45)}
+.verdict.R{background:linear-gradient(90deg,rgba(200,96,40,.24),rgba(2,14,22,.5))}
+.verdict.R .big{background:rgba(200,96,40,.28);color:var(--sur);border:1px solid rgba(255,178,122,.45)}
+
+/* ---------- chips ---------- */
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-top:10px}
+.chip{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);
+  border-radius:13px;padding:9px 11px}
+.chip .dot{flex:none;width:30px;height:30px;border-radius:50%;border:2px dashed rgba(0,0,0,.45);
+  box-shadow:0 0 0 2px rgba(255,255,255,.45) inset,0 3px 8px rgba(0,0,0,.45)}
+.chip b{display:block;font-size:14.5px;line-height:1.2}
+.chip small{display:block;font-size:11.5px;color:var(--mute);line-height:1.3}
+
+footer{margin:30px 0 4px;text-align:center;font-size:12px;color:#7f97a6;line-height:1.8}
+footer a{color:#9fc7d8}
+.src{font-size:12px;color:var(--mute)}
+.src li{margin:3px 0}
+
+@media(max-width:520px){
+  .matrix{table-layout:fixed;width:100%;min-width:0;font-size:12px}
+  .matrix th.hand{width:66px;min-width:0;font-size:11.5px;padding:5px 4px;white-space:normal}
+  .matrix thead th{width:auto;min-width:0;padding:5px 0;font-size:11.5px}
+  .matrix td{padding:4px 0;font-size:12px}
+  .matrix sup{font-size:8px;margin-left:0}
+  .verdict .big{width:64px;height:64px;font-size:26px;border-radius:15px}
+}
+@media print{
+  body{background:#fff;color:#000}
+  .top,.lookup,footer .noprint{display:none}
+  .card,.act,.spec div,.tablewrap{border-color:#999;background:#fff}
+  h1,h2,h3,td,th,.matrix th.hand{color:#000 !important;text-shadow:none;background:#fff !important}
+  thead th{background:#eee !important}
+  td.a-H,td.a-S,td.a-D,td.a-P,td.a-R{color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  section{break-inside:avoid}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="row">
+    <div class="brand"><img src="icon-192.png" alt=""> 海立方 廿一點</div>
+    <a href="../" style="font-size:12.5px;text-decoration:none;color:var(--mute)">← 回主頁</a>
+  </div>
+  <nav class="navchips" aria-label="頁內導覽">
+    <a href="#rules">規則</a>
+    <a href="#deal">發牌</a>
+    <a href="#dealer">莊家補牌</a>
+    <a href="#actions">五個動作</a>
+    <a href="#surrender">投降</a>
+    <a href="#insurance">保險</a>
+    <a href="#settle">勝負</a>
+    <a href="#chart">策略表</a>
+    <a href="#lookup">現場速查</a>
+    <a href="#chips">籌碼</a>
+    <a href="#etiquette">禮儀</a>
+  </nav>
+</div>
+
+<main>
+
+<header class="hero">
+  <div class="hero-in">
+    <span class="kicker">澳博 SJM · Oceanus · 新口岸外港碼頭對面</span>
+    <h1>海立方 廿一點<small>6 副牌 · 莊家軟 17 停牌（S17）· 可分牌後加倍 · 可投降（莊 A 明牌除外）</small></h1>
+    <p class="tagline">Blackjack 賠 <b>3:2</b>　·　保險賠 <b>2:1</b>　·　投降輸 <b>一半</b>　·　本頁附完整基礎策略表及現場速查</p>
+    <dl class="spec">
+      <div><dt>牌數</dt><dd>6 副牌<em>312 張</em></dd></div>
+      <div><dt>莊家</dt><dd>S17<em>軟 17 一律停牌</em></dd></div>
+      <div><dt>加倍</dt><dd>任何兩張<em>分牌後亦可（DAS）</em></dd></div>
+      <div><dt>投降</dt><dd>頭兩張牌<em>莊明牌 A 則不得投降</em></dd></div>
+      <div><dt>Blackjack</dt><dd>3 : 2<em>分牌後 21 只賠 1:1</em></dd></div>
+      <div><dt>保險</dt><dd>2 : 1<em>上限原注一半</em></dd></div>
+    </dl>
+  </div>
+</header>
+
+<section id="rules">
+  <h2><span class="n">1</span>牌點定義與目標</h2>
+  <div class="grid g2">
+    <div class="card">
+      <table class="kv">
+        <tbody>
+          <tr><td>2 – 10</td><td>按牌面數字計分</td></tr>
+          <tr><td>J / Q / K</td><td>一律當 <strong>10</strong> 點</td></tr>
+          <tr><td>A</td><td>可算 <strong>1</strong> 或 <strong>11</strong>，以不爆牌為準</td></tr>
+        </tbody>
+      </table>
+      <p class="small" style="margin-top:10px">
+        <strong>軟牌</strong>：A 當 11 而且未爆（例如 A + 6 = 軟 17）。<br>
+        <strong>硬牌</strong>：A 只能當 1（例如 A + 6 + 10 = 硬 17）。
+      </p>
+    </div>
+    <div class="card">
+      <p style="margin-top:0"><strong>目標</strong>：牌點高過莊家而不超過 21 點。</p>
+      <p class="small">超過 21 點即<strong>爆牌</strong>，立即輸掉該注，即使莊家之後同樣爆牌亦不會退回。</p>
+      <div class="callout ok" style="margin-bottom:0">
+        廿一點（Blackjack）指<strong>首兩張牌</strong>剛好 A + 10 點牌，賠 3:2；但<strong>分牌後</strong>再組成的 21 點只當普通 21 點，賠 1:1。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="deal">
+  <h2><span class="n">2</span>發牌流程</h2>
+  <ol class="steps">
+    <li>閒家先下注。荷官由<strong>左手第一基</strong>開始順時針派牌，閒家兩張牌<strong>全部攤開</strong>；莊家一張明牌、一張暗牌。</li>
+    <li>莊家明牌為 <strong>A 或 10 點牌</strong>時，先翻暗牌核對是否 Blackjack（瞇牌）：<br>
+      <span class="muted">✅ 莊家有 Blackjack → 直接結局，閒家無 Blackjack 即輸；閒家同樣有 Blackjack 則打和（Push）。<br>
+      ❌ 莊家沒有 Blackjack → 輪到閒家逐一決定（H／S／D／P／投降）。</span></li>
+    <li>全部閒家決定完畢，莊家才補牌。</li>
+  </ol>
+  <div class="callout">
+    <b>順序</b>：多人桌由第一基（最左）先打，尾座（最右）最後決定。所以前面的人要牌會影響之後的牌，但唔可以出聲指導或批評別人點打。
+  </div>
+</section>
+
+<section id="dealer">
+  <h2><span class="n">3</span>莊家補牌：S17 是重點</h2>
+  <div class="grid g2">
+    <div class="card" style="border-color:rgba(134,239,196,.4)">
+      <h3 style="margin-top:0;color:var(--stand)">必須補牌</h3>
+      <p style="margin:0">莊家<strong>硬 16 點或以下</strong> → 一定要補。</p>
+    </div>
+    <div class="card" style="border-color:rgba(255,157,157,.4)">
+      <h3 style="margin-top:0;color:var(--hit)">一定停牌</h3>
+      <p style="margin:0">硬 17、<strong>軟 17</strong>、18、19、20、21 → 全部停牌，不會再補。</p>
+    </div>
+  </div>
+  <div class="callout warn">
+    <b>海立方是 S17</b>：莊家 A + 6（軟 17）<strong>唔會再補牌</strong>。呢點同 H17 檯（莊家軟 17 要補）完全唔同，會直接影響下面策略表幾個格（例如 11 對 A、A,8 對 6）。
+  </div>
+  <p class="small muted">換句話講：莊家爆牌只可能發生在「硬 12 – 16」的情況，軟 17 永遠唔會爆。呢個規則對莊家略為有利，所以 H17 檯的策略表和 S17 檯唔可以混用。</p>
+</section>
+
+<section id="actions">
+  <h2><span class="n">4</span>閒家五個動作（含手勢）</h2>
+  <p class="small muted" style="margin-top:0">檯面<strong>不准用手觸碰任何牌</strong>，全部用手勢同荷官溝通。落注後先做決定，荷官會逐一確認。</p>
+  <div class="acts">
+    <div class="act hit">
+      <div class="hd"><b>HIT 要牌</b><span>H</span><i>Hit</i></div>
+      <p>逐張補牌，可以一路要，直到停牌或者爆牌為止。</p>
+      <div class="ges">手勢：手指敲枱面（或向自己方向撥）。</div>
+    </div>
+    <div class="act stand">
+      <div class="hd"><b>STAND 停牌</b><span>S</span><i>Stand</i></div>
+      <p>唔再要牌，輪到下一位閒家；莊家最後才補牌。</p>
+      <div class="ges">手勢：手掌左右搖。</div>
+    </div>
+    <div class="act dbl">
+      <div class="hd"><b>DOUBLE 加倍</b><span>D</span><i>Double</i></div>
+      <p>只可以在<strong>頭兩張牌</strong>使用；分牌之後（A 對除外）亦可以加倍。<br>
+      加倍之後<strong>只可以額外拿一張牌</strong>，之後必須停牌，不能再要。</p>
+      <div class="ges">手勢：把同等籌碼放原本注碼旁邊，單手掌向下指。</div>
+    </div>
+    <div class="act spl">
+      <div class="hd"><b>SPLIT 分牌</b><span>P</span><i>Split</i></div>
+      <p>頭兩張牌<strong>點數相同</strong>即可分成兩門獨立手牌，每門注碼等同原注。</p>
+      <p class="small" style="color:#ffd0b0">A,A 分牌：每門<strong>只可以再拿一張牌</strong>，不能再補、不能再加倍；分牌後拿到 21 點<strong>唔算 Blackjack</strong>，只賠 1:1。其他對子（88、99 等）分開後可以正常要牌、加倍。</p>
+      <div class="ges">手勢：加放同等籌碼，同時比 V 字手勢（兩指分開）。</div>
+    </div>
+    <div class="act sur">
+      <div class="hd"><b>SURRENDER 投降</b><span>R</span><i>Surrender</i></div>
+      <p>只可以在<strong>頭兩張牌</strong>、而且莊家未核對完 Blackjack 之前決定。投降即<strong>輸一半注碼</strong>，另一半退回。</p>
+      <p class="small" style="color:#ffd0b0">莊明牌 <strong>A → 完全禁止投降</strong>（澳博法定規則）。已經要牌、加倍或分牌之後，亦不可以再投降。</p>
+      <div class="ges">手勢：用手指在枱面畫一條斜線（或講「投降」，視乎該檯安排）。</div>
+    </div>
+  </div>
+</section>
+
+<section id="surrender">
+  <h2><span class="n">5</span>投降：數學上只有三個場景</h2>
+  <p style="margin-top:0">投降唔係懦弱，係用<strong>半注</strong>換走一個長期蝕錢的局面。經過逐格計算，呢三個場景投降比要牌/停牌更划算：</p>
+  <div class="tablewrap">
+    <table class="kv">
+      <thead><tr><th>你的牌</th><th>莊家明牌</th><th>原因</th></tr></thead>
+      <tbody>
+        <tr><td>硬 15（非對子）</td><td>10</td><td>要牌平均蝕 ~0.504 注，投降只蝕 0.5 注</td></tr>
+        <tr><td>硬 16（非對子）</td><td>9</td><td>同上，要牌蝕更多</td></tr>
+        <tr><td>硬 16（非對子）</td><td>10</td><td>最典型投降格</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <b>88 唔投降</b>：8,8 對 10 或 A 一定要<strong>分牌</strong>。分牌之後每門的期望值高過投降輸一半。<br>
+    <b>對 A 唔投降</b>：海立方莊明牌 A 禁止投降，所以硬 15、硬 16 對 A 只可以照策略表要牌。
+  </div>
+  <h3>正確使用順序</h3>
+  <ol class="steps">
+    <li>拿到頭兩張牌 → <strong>第一步先問：呢一刻可否投降？</strong></li>
+    <li>可以投降（莊明牌 2–10）→ 對照上面三個場景；中 → 投降。</li>
+    <li>唔中或者唔可以投降 → 照基礎策略表做 H／S／D／P。</li>
+  </ol>
+  <p class="small muted">網上普遍流傳的策略表多數<strong>只有</strong> H／S／D／P，冇內建投降判斷（因為投降屬於「後期投降 Late Surrender」，要另外加）。本頁策略表<strong>已經把投降計入</strong>，標 <span style="color:var(--sur);font-weight:700">R</span> 的格就是投降。</p>
+</section>
+
+<section id="insurance">
+  <h2><span class="n">6</span>保險</h2>
+  <div class="grid g2">
+    <div class="card">
+      <ul style="margin:0">
+        <li>莊家明牌為 <strong>A</strong> 時開放保險。</li>
+        <li>保險注上限為<strong>原注的一半</strong>。</li>
+        <li>莊家真的有 Blackjack → 保險賠 <strong>2:1</strong>；</li>
+        <li>莊家冇 Blackjack → <strong>保險注沒收</strong>。</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:rgba(255,157,157,.35)">
+      <p style="margin:0"><strong>結論：永遠唔好買保險。</strong></p>
+      <p class="small">除咗你確定自己數牌、真係知道剩返好多 10 點牌，否則保險係長期負期望。基礎策略的立場一向都係<strong>唔買</strong>。</p>
+    </div>
+  </div>
+</section>
+
+<section id="settle">
+  <h2><span class="n">7</span>勝負與賠率</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th style="width:38%">情況</th><th>結果</th></tr></thead>
+      <tbody>
+        <tr><td>閒家爆牌</td><td>即時輸，<strong>逆轉唔到</strong>（即使莊家之後都爆）</td></tr>
+        <tr><td>閒家 Blackjack（首兩張 A + 10 點牌）</td><td>賠 <strong>1.5 倍</strong>（3:2）；分牌後組成的 21 只賠 1 倍</td></tr>
+        <tr><td>閒家同莊家點數相同</td><td><strong>打和 Push</strong>，籌碼退回</td></tr>
+        <tr><td>閒家點數高過莊家（雙方都冇爆）</td><td>贏 <strong>1 倍</strong>注碼</td></tr>
+        <tr><td>莊家爆牌、閒家冇爆</td><td>贏 <strong>1 倍</strong>注碼</td></tr>
+        <tr><td>莊家 Blackjack</td><td>閒家輸（除非閒家同樣 Blackjack → Push）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="chart">
+  <h2><span class="n">8</span>基礎策略表（6 副牌 · S17 · DAS · 含投降）</h2>
+  <p style="margin-top:0" class="small">
+    用法：左邊搵你的牌，上面搵莊家明牌，交叉格就是最佳動作。
+    全部格子按 <strong>6 副牌、莊家 S17、可分牌後加倍、可投降（莊 A 除外）</strong> 逐格計算期望值；“唔投降就照表做”已經計埋。
+  </p>
+
+  <div class="legend">
+    <span class="lg-H"><i></i><b>H</b> 要牌</span>
+    <span class="lg-S"><i></i><b>S</b> 停牌</span>
+    <span class="lg-D"><i></i><b>D</b> 加倍</span>
+    <span class="lg-P"><i></i><b>P</b> 分牌</span>
+    <span class="lg-R"><i></i><b>R</b> 投降</span>
+    <span><b>小字</b>＝唔可以加倍／分牌時改做呢個動作</span>
+  </div>
+
+  <h3>硬牌（冇 A，或者 A 只當 1）</h3>
+  <div class="tablewrap">
+    <table class="matrix">
+      <thead><tr><th class="hand">你的牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></thead>
+      <tbody><tr><th class="hand">硬 17–21</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td></tr><tr><th class="hand">硬 16</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-R">R<sup>h</sup></td><td class="a-R">R<sup>h</sup></td><td class="a-H">H</td></tr><tr><th class="hand">硬 15</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-R">R<sup>h</sup></td><td class="a-H">H</td></tr><tr><th class="hand">硬 14</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">硬 13</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">硬 12</th><td class="a-H">H</td><td class="a-H">H</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">硬 11</th><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td></tr><tr><th class="hand">硬 10</th><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">硬 9</th><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">硬 8 以下</th><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>軟牌（A 當 11）</h3>
+  <div class="tablewrap">
+    <table class="matrix">
+      <thead><tr><th class="hand">你的牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></thead>
+      <tbody><tr><th class="hand">A,9 <span class="muted" style="font-weight:400">軟 20</span></th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td></tr><tr><th class="hand">A,8 <span class="muted" style="font-weight:400">軟 19</span></th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td></tr><tr><th class="hand">A,7 <span class="muted" style="font-weight:400">軟 18</span></th><td class="a-S">S</td><td class="a-D">D<sup>s</sup></td><td class="a-D">D<sup>s</sup></td><td class="a-D">D<sup>s</sup></td><td class="a-D">D<sup>s</sup></td><td class="a-S">S</td><td class="a-S">S</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">A,6 <span class="muted" style="font-weight:400">軟 17</span></th><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">A,5 <span class="muted" style="font-weight:400">軟 16</span></th><td class="a-H">H</td><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">A,4 <span class="muted" style="font-weight:400">軟 15</span></th><td class="a-H">H</td><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">A,3 <span class="muted" style="font-weight:400">軟 14</span></th><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">A,2 <span class="muted" style="font-weight:400">軟 13</span></th><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>對子（可分牌）</h3>
+  <div class="tablewrap">
+    <table class="matrix">
+      <thead><tr><th class="hand">你的牌</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>A</th></tr></thead>
+      <tbody><tr><th class="hand">A,A</th><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td></tr><tr><th class="hand">10,10</th><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td><td class="a-S">S</td></tr><tr><th class="hand">9,9</th><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-S">S</td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-S">S</td><td class="a-S">S</td></tr><tr><th class="hand">8,8</th><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td></tr><tr><th class="hand">7,7</th><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">6,6</th><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-P">P<sup>s</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">5,5 <span class="muted" style="font-weight:400">當10</span></th><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-D">D<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">4,4</th><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">3,3</th><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr><tr><th class="hand">2,2</th><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-P">P<sup>h</sup></td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td><td class="a-H">H</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <b>幾點要記住</b>：<br>
+    · 11 對 A <strong>要牌</strong>（S17 檯唔好加倍；H17 檯先會加倍）。<br>
+    · A,7（軟 18）對 2 <strong>停牌</strong>；對 3–6 加倍；對 7、8 停牌；對 9、10、A 要牌。<br>
+    · A,8（軟 19）對 6 <strong>停牌</strong>（呢格 H17 檯會加倍）。<br>
+    · 12 對 2、3 要牌；對 4、5、6 停牌。<br>
+    · 9,9 對 7 <strong>停牌</strong>（唔分牌）；9,9 對 9 分牌。<br>
+    · 5,5 永遠當硬 10 加倍，唔分牌；10,10 永遠停牌。<br>
+    · 8,8 對 A 都要分牌（莊明牌 A 冇得投降）。
+  </div>
+  <p class="small muted">計算方法：硬牌把該點數<strong>所有可能的兩張牌組合</strong>按出現機會加權（例如 16 點會綜合 10+6、9+7 等情況），軟牌及對子按實際兩張牌計算；牌靴為 6 副牌，莊家 S17，可分牌後加倍，投降只限莊明牌 2–10。全部 240 個格都逐格比較 H／S／D／P／R 的期望值。</p>
+  <p class="small muted" id="edgeNote">以上策略按 6 副牌、莊家 S17、可分牌後加倍、可投降（莊明牌 A 除外）逐格計算期望值。用 6 副牌真實牌靴模擬 60 萬局，長期每注期望值約 <strong>−0.7%</strong>（即每 $100 注碼平均蝕約 $0.7）；公開資料同類規則通常列作約 0.5%，差別主要來自本表按「只分一次牌」計算，以及莊明牌 A 不准投降。任何策略都改變不了「長玩必蝕」這個事實，唯一能控制的是注碼同時間。</p>
+</section>
+
+<section id="lookup">
+  <h2><span class="n">9</span>現場速查</h2>
+  <p style="margin-top:0" class="small muted">揀你的牌同莊家明牌，即刻有答案。記住：<strong>先判投降</strong>，可以投降先睇 R。</p>
+  <div class="lookup">
+    <div class="who">
+      <div class="picker">
+        <div class="lb">你的牌</div>
+        <div class="btns" id="handKind">
+          <button type="button" data-kind="h" aria-pressed="true">硬牌</button>
+          <button type="button" data-kind="s" aria-pressed="false">軟牌</button>
+          <button type="button" data-kind="p" aria-pressed="false">對子</button>
+        </div>
+        <div class="btns" id="handPick" style="margin-top:8px"></div>
+        <div class="ynote" id="handNote"></div>
+      </div>
+      <div class="picker">
+        <div class="lb">莊家明牌</div>
+        <div class="btns" id="upPick"></div>
+        <div class="ynote">莊家明牌 A 時，本檯<strong>唔准投降</strong>，所以速查唔會出現 R。</div>
+      </div>
+    </div>
+    <div class="verdict" id="verdict" aria-live="polite">
+      <div class="big" id="vBig">S</div>
+      <div class="txt"><b id="vTitle">停牌</b><span id="vDesc"></span></div>
+    </div>
+  </div>
+</section>
+
+<section id="chips">
+  <h2><span class="n">10</span>籌碼面額（新版海立方）</h2>
+  <p style="margin-top:0" class="small muted">檯面以籌碼計數，兌換以場內賬房為準；不同檯有不同最低／最高注碼。</p>
+  <div class="chips">
+    <div class="chip"><span class="dot" style="background:#7a4a2a"></span><span><b>$10</b><small>啡色</small></span></div>
+    <div class="chip"><span class="dot" style="background:#8fd6a8;box-shadow:0 0 0 3px #1d1d1d inset,0 3px 8px rgba(0,0,0,.45)"></span><span><b>$50</b><small>淺綠 · 側邊黑紋</small></span></div>
+    <div class="chip"><span class="dot" style="background:#1f6b40"></span><span><b>$100</b><small>深綠</small></span></div>
+    <div class="chip"><span class="dot" style="background:#e08b2d"></span><span><b>$500</b><small>橙色</small></span></div>
+    <div class="chip"><span class="dot" style="background:#9aa3a8"></span><span><b>$1,000</b><small>灰色</small></span></div>
+  </div>
+</section>
+
+<section id="etiquette">
+  <h2><span class="n">11</span>檯面禮儀與禁令</h2>
+  <div class="card">
+    <ul style="margin:0">
+      <li><strong>唔可以觸碰牌</strong>：全程用手勢溝通，唔好大聲講「要牌」「停牌」。</li>
+      <li><strong>唔可以指導、評論其他玩家</strong>，荷官會即時制止。</li>
+      <li>多人桌次序：第一基（最左）先打，尾座（最右）最後決定。</li>
+      <li>下注後唔可以中途加注或減注，亦唔可以觸碰已下注的籌碼。</li>
+      <li>手機靜音，拍照、錄影一律禁止。</li>
+      <li>澳門法定<strong>年滿 21 歲</strong>方可進入娛樂場，場內有權要求出示身份證件。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="about">
+  <h2><span class="n">12</span>關於海立方</h2>
+  <div class="card">
+    <p style="margin-top:0">回力海立方娛樂場（Oceanus，簡稱海立方）是澳博（SJM）旗下的娛樂場，2009 年 12 月 15 日開幕，位於澳門新口岸<strong>友誼大馬路 1579 號</strong>，就在<strong>外港客運碼頭對面</strong>，有天橋直接連接碼頭。</p>
+    <p class="small">三層博彩區，約 260 張賭檯及 560 台角子機；建築外形仿北京「水立方」，入夜以 LED 變色，是澳門唯一與碼頭相連的娛樂場。除了廿一點，場內亦有百家樂、三公百家樂、骰寶、輪盤、番攤、魚蝦蟹及各類撲克。</p>
+    <p class="small muted" style="margin-bottom:0">資料來源：<a href="https://www.sjmholdings.com/zh/媒體中心/新聞稿/item/470-sjm-to-open-casino-oceanus-at-jai-alai-the-first-casino-in-macau-on-15-december" target="_blank" rel="noopener">澳博新聞稿（2009）</a>、<a href="https://zh.wikipedia.org/zh-hk/回力海立方娛樂場" target="_blank" rel="noopener">維基百科</a>。規則以場內桌面公告及荷官指示為最終依據。</p>
+  </div>
+</section>
+
+<footer>
+  <p style="margin:0 0 4px"><strong>本頁只供規則參考及學習之用，唔涉及真實金錢，亦唔保證任何形式的回報。</strong></p>
+  <p style="margin:0" class="noprint">博彩有風險，投注要節制；如覺得自己失去控制，請即時離開並尋求協助。<br>
+  <a href="https://www.ias.gov.mo/" target="_blank" rel="noopener">澳門社工局</a> · 澳門<strong>年滿 21 歲</strong>方可進入娛樂場 · <a href="../">回主頁</a></p>
+</footer>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var DATA = {"h5":{"2":["H"],"3":["H"],"4":["H"],"5":["H"],"6":["H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h6":{"2":["H"],"3":["H"],"4":["H"],"5":["H"],"6":["H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h7":{"2":["H"],"3":["H"],"4":["H"],"5":["H"],"6":["H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h8":{"2":["H"],"3":["H"],"4":["H"],"5":["H"],"6":["H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h9":{"2":["H"],"3":["D","H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h10":{"2":["D","H"],"3":["D","H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["D","H"],"8":["D","H"],"9":["D","H"],"10":["H"],"1":["H"]},"h11":{"2":["D","H"],"3":["D","H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["D","H"],"8":["D","H"],"9":["D","H"],"10":["D","H"],"1":["H"]},"h12":{"2":["H"],"3":["H"],"4":["S"],"5":["S"],"6":["S"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h13":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h14":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"h15":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["H"],"8":["H"],"9":["H"],"10":["R","H"],"1":["H"]},"h16":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["H"],"8":["H"],"9":["R","H"],"10":["R","H"],"1":["H"]},"h17":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"h18":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"h19":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"h20":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"h21":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"s2":{"2":["H"],"3":["H"],"4":["H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"s3":{"2":["H"],"3":["H"],"4":["H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"s4":{"2":["H"],"3":["H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"s5":{"2":["H"],"3":["H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"s6":{"2":["H"],"3":["D","H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"s7":{"2":["S"],"3":["D","S"],"4":["D","S"],"5":["D","S"],"6":["D","S"],"7":["S"],"8":["S"],"9":["H"],"10":["H"],"1":["H"]},"s8":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"s9":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"p1":{"2":["P","H"],"3":["P","H"],"4":["P","H"],"5":["P","H"],"6":["P","H"],"7":["P","H"],"8":["P","H"],"9":["P","H"],"10":["P","H"],"1":["P","H"]},"p2":{"2":["P","H"],"3":["P","H"],"4":["P","H"],"5":["P","H"],"6":["P","H"],"7":["P","H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"p3":{"2":["P","H"],"3":["P","H"],"4":["P","H"],"5":["P","H"],"6":["P","H"],"7":["P","H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"p4":{"2":["H"],"3":["H"],"4":["H"],"5":["P","H"],"6":["P","H"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"p6":{"2":["P","H"],"3":["P","H"],"4":["P","S"],"5":["P","S"],"6":["P","S"],"7":["H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"p7":{"2":["P","S"],"3":["P","S"],"4":["P","S"],"5":["P","S"],"6":["P","S"],"7":["P","H"],"8":["H"],"9":["H"],"10":["H"],"1":["H"]},"p8":{"2":["P","S"],"3":["P","S"],"4":["P","S"],"5":["P","S"],"6":["P","S"],"7":["P","H"],"8":["P","H"],"9":["P","H"],"10":["P","H"],"1":["P","H"]},"p9":{"2":["P","S"],"3":["P","S"],"4":["P","S"],"5":["P","S"],"6":["P","S"],"7":["S"],"8":["P","S"],"9":["P","S"],"10":["S"],"1":["S"]},"p10":{"2":["S"],"3":["S"],"4":["S"],"5":["S"],"6":["S"],"7":["S"],"8":["S"],"9":["S"],"10":["S"],"1":["S"]},"p5":{"2":["D","H"],"3":["D","H"],"4":["D","H"],"5":["D","H"],"6":["D","H"],"7":["D","H"],"8":["D","H"],"9":["D","H"],"10":["H"],"1":["H"]}};
+
+  // ---------- interactive lookup ----------
+  var ups = ['2','3','4','5','6','7','8','9','10','1'];
+  var kind = 'h', pick = '16', up = '10';
+
+  var KIND_LABEL = {h:'硬牌', s:'軟牌', p:'對子'};
+  var ACTION = {
+    H: {t:'要牌', d:'繼續補牌，直到停牌或者爆牌。', cls:'H'},
+    S: {t:'停牌', d:'唔好再要牌，等莊家補牌。', cls:'S'},
+    D: {t:'加倍', d:'加注一倍，只拿一張牌後停牌。', cls:'D'},
+    P: {t:'分牌', d:'分成兩門，各自加注一倍。', cls:'P'},
+    R: {t:'投降', d:'輸一半注碼，取回另一半。', cls:'R'}
+  };
+
+  function keyFor() { return kind + pick; }
+
+  function renderPicker() {
+    var box = document.getElementById('handPick'), note = document.getElementById('handNote');
+    var list = [];
+    var i;
+    if (kind === 'h') {
+      for (i = 5; i <= 17; i++) list.push({v: String(i), label: String(i)});
+    } else if (kind === 's') {
+      for (i = 9; i >= 2; i--) list.push({v: String(i), label: 'A' + i});
+    } else {
+      var pr = [['1','A,A'],['2','2,2'],['3','3,3'],['4','4,4'],['6','6,6'],['7','7,7'],['8','8,8'],['9','9,9'],['10','10,10']];
+      pr.forEach(function (p) { list.push({v: p[0], label: p[1]}); });
+    }
+    if (!list.some(function (o) { return o.v === pick; })) pick = list[0].v;
+    box.innerHTML = '';
+    list.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = o.label; b.dataset.v = o.v;
+      b.setAttribute('aria-pressed', String(o.v === pick));
+      b.addEventListener('click', function () { pick = o.v; renderPicker(); show(); });
+      box.appendChild(b);
+    });
+    if (kind === 'h') note.textContent = '揀你手上牌的總點數（A 當 1 計的硬牌）。';
+    else if (kind === 's') note.textContent = 'A 加上另一張牌的軟牌，例如 A+7 是軟 18。';
+    else note.textContent = '首兩張牌點數相同才可以分牌。';
+  }
+
+  function renderUps() {
+    var box = document.getElementById('upPick');
+    box.innerHTML = '';
+    ups.forEach(function (u) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = (u === '1' ? 'A' : u);
+      if (u === '1' || u === '10') b.className = 'red';
+      b.setAttribute('aria-pressed', String(u === up));
+      b.addEventListener('click', function () { up = u; renderUps(); show(); });
+      box.appendChild(b);
+    });
+  }
+
+  function show() {
+    var cell = DATA[keyFor()] && DATA[keyFor()][up];
+    var v = document.getElementById('verdict');
+    if (!cell) { return; }
+    var code = cell[0], fb = cell[1];
+    var a = ACTION[code];
+    var desc = a.d;
+    if (fb && fb !== code && ACTION[fb]) {
+      desc += '　若不可以' + ACTION[code].t + '，改為' + ACTION[fb].t + '。';
+    }
+    if (code === 'D') desc += '　只限頭兩張牌。';
+    if (code === 'R') desc += '　限頭兩張牌，而且要在莊家核對完 Blackjack 之前。';
+    document.getElementById('vBig').textContent = code;
+    document.getElementById('vTitle').textContent = a.t;
+    document.getElementById('vDesc').textContent = desc;
+    v.className = 'verdict ' + a.cls;
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#handKind button'), function (b) {
+    b.addEventListener('click', function () {
+      kind = b.dataset.kind;
+      Array.prototype.forEach.call(document.querySelectorAll('#handKind button'), function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      renderPicker(); show();
+    });
+  });
+
+  renderPicker(); renderUps(); show();
+
+  // ---------- service worker ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
