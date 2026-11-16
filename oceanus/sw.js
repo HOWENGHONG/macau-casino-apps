@@ -3,7 +3,7 @@
    an older worker that cached play.html. Icons stay cache-first.
    Requests with a reload/no-cache mode go to the network, so the next
    worker can precache fresh files while this one is still in control. */
-var PREFIX = 'oceanus-', CACHE = PREFIX + 'oce21-2026-11d';
+var PREFIX = 'oceanus-', CACHE = PREFIX + 'oce21-2026-11e';
 var ASSETS = ["./", "./index.html", "./play.html", "./engine.js", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 

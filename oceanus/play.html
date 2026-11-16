@@ -59,6 +59,12 @@ body{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;c
     radial-gradient(circle at 60% 42%,rgba(255,255,255,.05) 0 40px,transparent 41px),
     radial-gradient(120% 80% at 50% 0%,var(--felt1),var(--felt2) 46%,var(--felt3));
   box-shadow:inset 0 0 0 2px rgba(231,197,106,.38),inset 0 0 70px rgba(0,0,0,.38)}
+.felt::before{content:"";position:absolute;left:7%;right:7%;bottom:6%;height:48%;
+  border:1.5px solid rgba(231,197,106,.34);border-radius:50%;pointer-events:none;
+  box-shadow:inset 0 0 0 10px rgba(231,197,106,.05),0 0 0 1px rgba(0,0,0,.15)}
+.felt::after{content:"";position:absolute;left:18%;right:18%;bottom:14%;height:22%;
+  border:1px solid rgba(231,197,106,.18);border-radius:50%;pointer-events:none}
+.zone,.play{position:relative;z-index:1}
 .mark{text-align:center;pointer-events:none}
 .mark .pays{font-family:"Iowan Old Style",Palatino,"Palatino Linotype",Georgia,serif;
   color:rgba(231,197,106,.78);letter-spacing:2px;font-size:13px}
@@ -71,7 +77,9 @@ body{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;c
   border-radius:999px;padding:1px 8px;background:rgba(0,0,0,.28);box-shadow:inset 0 0 0 1px rgba(180,230,240,.25)}
 .tot.bust{color:var(--lose);box-shadow:inset 0 0 0 1px rgba(255,155,138,.45)}
 .tot.bj{color:var(--gold2);box-shadow:inset 0 0 0 1px rgba(231,197,106,.6)}
-.shoe{letter-spacing:0;color:rgba(244,239,228,.55);font-size:11px}
+.shoe{letter-spacing:0;color:rgba(244,239,228,.82);font-size:11px;
+  background:linear-gradient(180deg,#1a5870,#0c3142);border-radius:7px;padding:2px 8px;
+  box-shadow:inset 0 0 0 1px rgba(231,197,106,.4),0 3px 0 #06202c}
 
 .cards{display:flex;justify-content:center;align-items:flex-end;min-height:96px;padding:4px 8px 0}
 .card{position:relative;flex:none;width:64px;height:92px;margin-left:-26px;border-radius:9px;
@@ -188,9 +196,17 @@ dialog .x{margin-top:8px;width:100%}
 
 @media(min-width:720px){
   .stage{padding:4px 8vw 10px}
-  .card{width:72px;height:104px}
-  .card .pip{font-size:34px}
+  .card{width:84px;height:120px;margin-left:-32px}
+  .card .ix b{font-size:18px}
+  .card .pip{font-size:40px}
+  .cards{min-height:128px}
+  .banner{font-size:22px}
   .acts:not(.pair){grid-template-columns:repeat(5,1fr)}
+}
+@media(min-width:1100px){
+  .card{width:92px;height:132px}
+  .card .pip{font-size:44px}
+  .cards{min-height:140px}
 }
 @media(max-width:380px){
   .chip{width:50px;height:50px}
