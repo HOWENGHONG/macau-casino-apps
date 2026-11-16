@@ -121,8 +121,8 @@
     this.hands = [p];
     this.dealer.cards = [this.draw(), this.draw()];
 
-    // peek: dealer shows an ace or a ten
-    if (isAceUp(this.dealerUp()) && this.bankroll >= bet / 2) {
+    // 莊明牌 A：一定先問保險（餘額不夠買時，介面只留「唔買」）
+    if (isAceUp(this.dealerUp())) {
       this.phase = 'insurance';
       return { ok: true };
     }
@@ -220,7 +220,6 @@
       var h2 = { cards: [h.cards[1], this.draw()], bet: h.bet, done: false, fromSplit: true, splitAces: isA };
       this.hands.splice(this.active, 1, h1, h2);
       if (isA) { h1.done = true; h2.done = true; }
-      else if (totals(h1.cards).t === 21) { h1.done = true; }
       this.advance();
       return { ok: true };
     }
@@ -236,6 +235,9 @@
 
   Game.prototype.advance = function () {
     var i;
+    for (i = 0; i < this.hands.length; i++) {
+      if (totals(this.hands[i].cards).t >= 21) this.hands[i].done = true;
+    }
     for (i = this.active; i < this.hands.length; i++) {
       if (!this.hands[i].done) { this.active = i; this.phase = 'player'; return; }
     }
